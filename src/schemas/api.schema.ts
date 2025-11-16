@@ -97,8 +97,8 @@ export const CreateLibraryEntryRequestSchema = z.object({
 export const UpdateLibraryEntryRequestSchema = z.object({
   libraryName: z.enum(['character', 'pose', 'scene', 'theme', 'style', 'decorative_props']),
   entryId: z.string(),
-  entry: z.record(z.string(), z.any()).partial(),
-});
+  entry: z.record(z.string(), z.any()),
+}).partial({ entry: true });
 
 // Delete Library Entry
 export const DeleteLibraryEntryRequestSchema = z.object({

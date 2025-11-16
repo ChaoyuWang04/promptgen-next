@@ -1,0 +1,175 @@
+/**
+ * Template Management Hooks
+ * React Query hooks for template CRUD operations
+ */
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api/client';
+import { queryKeys } from '@/lib/api/query-client';
+import { useToast } from '@/hooks/use-toast';
+
+export interface Template {
+  id: string;
+  name: string;
+  type: 'main' | 'diff';
+  category: 'system' | 'user';
+  content: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateVariable {
+  name: string;
+  type: string;
+  description: string;
+  example?: string;
+}
+
+export interface PreviewRequest {
+  template_content: string;
+  library_ids: Record<string, string>;
+  type?: 'main' | 'diff';
+}
+
+export interface PreviewResponse {
+  prompt_cn: string;
+  prompt_en: string;
+  variables_used: string[];
+}
+
+/**
+ * Hook to fetch templates list
+ */
+export function useTemplates(type?: 'main' | 'diff', category?: 'system' | 'user') {
+  return useQuery<Template[]>({
+    queryKey: queryKeys.templates.list(type, category),
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (type) params.type = type;
+      if (category) params.category = category;
+      return api.get<Template[]>('/api/templates', params);
+    },
+  });
+}
+
+/**
+ * Hook to fetch a single template
+ */
+export function useTemplate(id: string) {
+  return useQuery<Template>({
+    queryKey: queryKeys.templates.detail(id),
+    queryFn: () => api.get<Template>(`/api/templates/${id}`),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Hook to fetch template variables
+ */
+export function useTemplateVariables(type: 'main' | 'diff' = 'main') {
+  return useQuery<TemplateVariable[]>({
+    queryKey: queryKeys.templates.variables(type),
+    queryFn: () => api.get<TemplateVariable[]>(`/api/templates/variables?type=${type}`),
+  });
+}
+
+/**
+ * Hook to preview template
+ */
+export function usePreviewTemplate() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: PreviewRequest) =>
+      api.post<PreviewResponse>('/api/templates/preview', request),
+    onError: (error: Error) => {
+      toast({
+        title: '预览失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to create a template
+ */
+export function useCreateTemplate() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (template: Omit<Template, 'id' | 'created_at' | 'updated_at'>) =>
+      api.post<Template>('/api/templates', template),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates.all });
+      toast({
+        title: '创建成功',
+        description: '模板已创建',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '创建失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to update a template
+ */
+export function useUpdateTemplate() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, ...template }: Partial<Template> & { id: string }) =>
+      api.put<Template>(`/api/templates/${id}`, template),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates.detail(variables.id) });
+      toast({
+        title: '更新成功',
+        description: '模板已更新',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '更新失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to delete a template
+ */
+export function useDeleteTemplate() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/templates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.templates.all });
+      toast({
+        title: '删除成功',
+        description: '模板已删除',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '删除失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
