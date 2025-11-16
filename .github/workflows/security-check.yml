@@ -1,0 +1,31 @@
+name: Security Check
+
+on:
+  push:
+    branches: [ main, master, dev, feature/* ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  detect-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install detect-secrets
+        run: pip install detect-secrets
+
+      - name: Scan for secrets
+        run: |
+          echo "🔍 Scanning for secrets..."
+          detect-secrets scan --baseline .secrets.baseline
+          if [ $? -ne 0 ]; then
+            echo "❌ SECURITY ALERT: Secrets detected in repository!"
+            exit 1
+          fi
+          echo "✅ No secrets detected."

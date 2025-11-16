@@ -1,0 +1,168 @@
+// PromptGen Database Schema
+// PostgreSQL + Prisma ORM
+// Version: 1.0.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// 库配置表
+// ========================================
+model Library {
+  id          String   @id @default(cuid())
+  name        String   @unique  // character, pose, scene, theme, style, decorative_props
+  displayName String            // 人物, 姿态, 场景, 主题, 画风, 装饰小物
+  entries     Json              // 库条目JSON数组
+  schema      Json?             // JSON Schema定义（用于验证）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+// ========================================
+// 生成记录表
+// ========================================
+model Record {
+  id                String   @id @default(cuid())
+  imageId           String   @unique  // betty_turnback_living_halloween_retro50s_0001
+
+  // 库选择（动态JSON结构，支持3-N个库）
+  libraryIds        Json     // {"character": "char_betty_v1", "pose": "...", ...}
+
+  // Outfit状态（Diff生成需要）
+  outfitMinorState  Json     // [{"element": "鞋子", "current_color": "红色"}]
+  usedDecorations   Json     // {"from_theme": [...], "from_scene": [...]}
+
+  // 关联关系
+  prompts           Prompt[]
+  variants          ImageVariant[]
+
+  // Provider信息
+  providerUsed      String?         // 最近一次使用的Provider: gemini, bytedance
+  providerAttempts  Json            // [{provider, success, error, attempted_at}]
+
+  // 状态标志
+  promptGenerated   Boolean  @default(false)
+  imageGenerated    Boolean  @default(false)
+
+  // 时间戳
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([imageId])
+  @@index([promptGenerated, imageGenerated])
+}
+
+// ========================================
+// Prompt表
+// ========================================
+model Prompt {
+  id         String     @id @default(cuid())
+  recordId   String
+  record     Record     @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  type       PromptType  // MAIN 或 DIFF
+  promptCn   String      @db.Text  // 中文Prompt
+  promptEn   String      @db.Text  // 英文Prompt
+
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([recordId, type])
+}
+
+enum PromptType {
+  MAIN
+  DIFF
+}
+
+// ========================================
+// 图片版本表
+// ========================================
+model ImageVariant {
+  id              String   @id @default(cuid())
+  recordId        String
+  record          Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  version         Int      // 1, 2, 3... (同一组合的多个版本用于A/B测试)
+  imageMainPath   String?  // images/{image_id}/v1_main.png
+  imageDiffPath   String?  // images/{image_id}/v1_diff.png
+  finalImages     Json?    // {"en": "path", "fr": "path", ...} 7种语言
+
+  generatedAt     DateTime @default(now())
+
+  @@unique([recordId, version])
+  @@index([recordId])
+}
+
+// ========================================
+// 模板表
+// ========================================
+model Template {
+  id          String           @id @default(cuid())
+  name        String           @unique  // template_default_v1, user_custom_template
+  description String?
+  type        TemplateType     // SYSTEM 或 USER
+  category    TemplateCategory // MAIN 或 DIFF
+  content     String           @db.Text  // 模板内容（可能很长）
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, category])
+}
+
+enum TemplateType {
+  SYSTEM  // 系统预置模板（只读）
+  USER    // 用户自定义模板
+}
+
+enum TemplateCategory {
+  MAIN  // 主图模板
+  DIFF  // 对比图模板
+}
+
+// ========================================
+// 批量任务表（异步任务追踪）
+// ========================================
+model ImageBatch {
+  id          String       @id @default(cuid())
+  imageIds    Json         // 要生成的image_id数组
+  totalImages Int
+  completed   Int          @default(0)
+  failed      Int          @default(0)
+  status      BatchStatus  @default(PENDING)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+}
+
+enum BatchStatus {
+  PENDING      // 等待开始
+  IN_PROGRESS  // 进行中
+  COMPLETED    // 已完成
+  FAILED       // 失败
+}
+
+// ========================================
+// 错误日志表（可选，用于错误追踪）
+// ========================================
+model ErrorLog {
+  id        String   @id @default(cuid())
+  level     String   // ERROR, WARN, INFO
+  message   String
+  stack     String?  @db.Text
+  context   Json?    // 额外上下文信息
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+}
