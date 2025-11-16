@@ -1,0 +1,9 @@
+{
+  "library_ids": {
+    "character": "char_betty_v1",
+    "pose": "pose_turn_back_smile_v1",
+    "scene": "scene_living_sofa_v1",
+    "theme": "theme_summer_v1",
+    "style": "style_retro1950_flat_v1"
+  }
+}

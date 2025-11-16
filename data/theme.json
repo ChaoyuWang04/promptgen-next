@@ -1,0 +1,121 @@
+{
+  "theme_halloween_v1": {
+    "id": "theme_halloween_v1",
+    "theme": "万圣节",
+    "palette_core": ["橙色点缀", "少量紫色对比", "整体保持明亮干净"],
+    "mood_words": ["轻松", "搞怪", "温馨"],
+    "micro_props": ["小南瓜", "蝙蝠剪纸", "橙色缎带", "小灯串"],
+    "max_micro_props": 3,
+    "strength": 0.6,
+    "decorative_props": [
+      {
+        "name": "南瓜灯笼",
+        "name_en": "pumpkin lantern",
+        "priority": "high"
+      },
+      {
+        "name": "蝙蝠挂件",
+        "name_en": "bat ornament",
+        "priority": "high"
+      },
+      {
+        "name": "骷髅头糖果",
+        "name_en": "skull candy",
+        "priority": "medium"
+      },
+      {
+        "name": "巫师帽装饰",
+        "name_en": "witch hat decoration",
+        "priority": "medium"
+      },
+      {
+        "name": "蜘蛛网贴纸",
+        "name_en": "spider web sticker",
+        "priority": "low"
+      }
+    ],
+    "max_decorative_props": 5,
+    "exclusion_rules": ["避免大面积深紫背景", "不得改变人物主色"]
+  },
+  "theme_christmas_v1": {
+    "id": "theme_christmas_v1",
+    "theme": "圣诞节",
+    "palette_core": ["红色与绿色为主", "金色点缀", "温暖色调"],
+    "mood_words": ["温馨", "节日", "欢乐"],
+    "micro_props": ["圣诞树", "雪花挂饰", "铃铛", "蝴蝶结"],
+    "max_micro_props": 3,
+    "strength": 0.7,
+    "decorative_props": [
+      {
+        "name": "圣诞袜",
+        "name_en": "Christmas stocking",
+        "priority": "high"
+      },
+      {
+        "name": "圣诞帽",
+        "name_en": "Santa hat",
+        "priority": "high"
+      },
+      {
+        "name": "礼物盒",
+        "name_en": "gift box",
+        "priority": "high"
+      },
+      {
+        "name": "拐杖糖",
+        "name_en": "candy cane",
+        "priority": "medium"
+      },
+      {
+        "name": "姜饼人",
+        "name_en": "gingerbread man",
+        "priority": "medium"
+      },
+      {
+        "name": "雪球",
+        "name_en": "snowball",
+        "priority": "low"
+      }
+    ],
+    "max_decorative_props": 5,
+    "exclusion_rules": ["避免过于宗教化的元素", "保持画面简洁不杂乱"]
+  },
+  "theme_summer_v1": {
+    "id": "theme_summer_v1",
+    "theme": "夏日",
+    "palette_core": ["明亮黄色", "天蓝色", "清爽绿色"],
+    "mood_words": ["活力", "清爽", "阳光"],
+    "micro_props": ["太阳帽", "太阳镜", "小扇子", "冰淇淋"],
+    "max_micro_props": 3,
+    "strength": 0.6,
+    "decorative_props": [
+      {
+        "name": "遮阳伞",
+        "name_en": "sun umbrella",
+        "priority": "high"
+      },
+      {
+        "name": "贝壳",
+        "name_en": "seashell",
+        "priority": "high"
+      },
+      {
+        "name": "海星",
+        "name_en": "starfish",
+        "priority": "medium"
+      },
+      {
+        "name": "椰子",
+        "name_en": "coconut",
+        "priority": "medium"
+      },
+      {
+        "name": "沙滩球",
+        "name_en": "beach ball",
+        "priority": "low"
+      }
+    ],
+    "max_decorative_props": 5,
+    "exclusion_rules": ["避免过于炎热感的色彩", "保持清爽明亮"]
+  }
+}

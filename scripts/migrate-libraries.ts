@@ -48,11 +48,11 @@ const LIBRARIES = [
   },
 ];
 
-// Path to the old Flask project data directory
-const OLD_DATA_DIR = path.resolve(__dirname, '../../data');
+// Path to the data directory (promptgen-next/data/)
+const DATA_DIR = path.resolve(__dirname, '../data');
 
 async function loadLibraryData(fileName: string): Promise<Record<string, any>> {
-  const filePath = path.join(OLD_DATA_DIR, fileName);
+  const filePath = path.join(DATA_DIR, fileName);
 
   try {
     const content = await fs.readFile(filePath, 'utf-8');
@@ -114,7 +114,7 @@ async function migrateLibrary(
 
 async function main() {
   console.log('🚀 Starting library data migration...');
-  console.log(`📂 Source directory: ${OLD_DATA_DIR}`);
+  console.log(`📂 Source directory: ${DATA_DIR}`);
 
   try {
     // Test database connection

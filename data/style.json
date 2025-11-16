@@ -1,0 +1,26 @@
+{
+  "style_retro1950_flat_v1": {
+    "id": "style_retro1950_flat_v1",
+    "style_id": "retro_1950s_flat",
+    "era_style": "1950年代美式复古",
+    "render_technique": "2D扁平, 干净线条, 明亮配色",
+    "line_weight": "中等",
+    "shade_level": "轻微阴影",
+    "color_temp": "中性偏暖",
+    "inspirations": ["The Flintstones", "The Jetsons"],
+    "style_adapter_strength": 0.7,
+    "negative_style": ["写实摄影风", "重噪点", "强对比硬阴影"]
+  },
+  "style_simpson_flat_v1": {
+    "id": "style_simpson_flat_v1",
+    "style_id": "simpson_flat",
+    "era_style": "现代美式卡通",
+    "render_technique": "2D扁平, 粗黑轮廓线, 赛璐珞着色, 明亮饱和配色",
+    "line_weight": "粗",
+    "shade_level": "极轻微(仅赛璐珞阴影)",
+    "color_temp": "明亮中性",
+    "inspirations": ["The Simpsons", "Family Guy", "Bob's Burgers"],
+    "style_adapter_strength": 0.75,
+    "negative_style": ["写实风", "渐变色", "厚涂", "水彩", "3D渲染"]
+  }
+}
