@@ -15,6 +15,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Settings, AlertCircle, Save } from 'lucide-react';
 
 export default function SettingsPage() {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // TODO: Implement settings save logic
+    console.log('Settings saved');
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -24,6 +30,8 @@ export default function SettingsPage() {
           配置系统参数和个人偏好
         </p>
       </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* General Settings */}
       <Card>
@@ -144,12 +152,13 @@ export default function SettingsPage() {
 
       {/* Save Button */}
       <div className="flex justify-end gap-2">
-        <Button variant="outline">重置</Button>
-        <Button>
+        <Button type="button" variant="outline">重置</Button>
+        <Button type="submit">
           <Save className="mr-2 h-4 w-4" />
           保存设置
         </Button>
       </div>
+      </form>
 
       {/* Development Notice */}
       <Alert>

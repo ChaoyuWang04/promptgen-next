@@ -97,11 +97,14 @@ export function Sidebar() {
                 <Button
                   variant={isActive ? 'secondary' : 'ghost'}
                   className={cn(
-                    'w-full justify-start gap-3',
-                    isActive && 'bg-secondary font-medium'
+                    'w-full justify-start gap-3 relative',
+                    isActive && 'bg-secondary font-semibold border-l-4 border-primary pl-2.5'
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className={cn(
+                    "h-4 w-4",
+                    isActive && "text-primary"
+                  )} />
                   <span>{item.title}</span>
                   {item.badge && (
                     <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
@@ -126,11 +129,14 @@ export function Sidebar() {
                 <Button
                   variant={isActive ? 'secondary' : 'ghost'}
                   className={cn(
-                    'w-full justify-start gap-3',
-                    isActive && 'bg-secondary font-medium'
+                    'w-full justify-start gap-3 relative',
+                    isActive && 'bg-secondary font-semibold border-l-4 border-primary pl-2.5'
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className={cn(
+                    "h-4 w-4",
+                    isActive && "text-primary"
+                  )} />
                   <span>{item.title}</span>
                 </Button>
               </Link>

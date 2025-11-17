@@ -56,4 +56,57 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* ============================================
+   * Focus Indicators (WCAG 2.4.7 Compliance)
+   * ============================================
+   * Provides visible focus indicators for keyboard navigation
+   * Uses :focus-visible to only show on keyboard interaction
+   */
+
+  /* Remove default outline to replace with custom styles */
+  *:focus {
+    outline: none;
+  }
+
+  /* High-contrast focus ring for keyboard navigation */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Specific focus styles for interactive elements */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [role="link"]:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px hsla(var(--ring) / 0.1);
+  }
+
+  /* Enhanced focus for primary actions */
+  button[data-variant="default"]:focus-visible,
+  button[data-variant="primary"]:focus-visible {
+    outline-color: hsl(var(--primary));
+    box-shadow: 0 0 0 4px hsla(var(--primary) / 0.2);
+  }
+
+  /* Destructive action focus */
+  button[data-variant="destructive"]:focus-visible {
+    outline-color: hsl(var(--destructive));
+    box-shadow: 0 0 0 4px hsla(var(--destructive) / 0.2);
+  }
+
+  /* Focus within for container elements */
+  [role="navigation"]:focus-within,
+  [role="menu"]:focus-within,
+  [role="dialog"]:focus-within {
+    /* Container gets subtle indication when child is focused */
+    outline: 1px solid hsla(var(--ring) / 0.3);
+  }
 }
