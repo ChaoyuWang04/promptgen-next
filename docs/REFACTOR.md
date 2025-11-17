@@ -1,34 +1,215 @@
 # PromptGen 全量重构设计文档
 # Next.js + TypeScript + shadcn/ui + Zod + PostgreSQL
 
-**文档版本**: 1.0.0
+**文档版本**: 1.1.0
 **创建日期**: 2025-11-15
-**最后更新**: 2025-11-15
+**最后更新**: 2025-11-16
 **作者**: Claude + Sam Wong
-**状态**: 规划阶段
+**状态**: 实施中（43%完成 - Phase 3 Complete）
 
 ---
 
 ## 目录
 
-1. [重构背景与目标](#1-重构背景与目标)
-2. [技术栈选型](#2-技术栈选型)
-3. [架构设计](#3-架构设计)
-4. [数据库设计](#4-数据库设计)
-5. [API设计](#5-api设计)
-6. [核心业务逻辑迁移](#6-核心业务逻辑迁移)
-7. [前端组件架构](#7-前端组件架构)
-8. [异步任务处理](#8-异步任务处理)
-9. [部署架构](#9-部署架构)
-10. [迁移计划](#10-迁移计划)
-11. [风险评估与缓解](#11-风险评估与缓解)
-12. [附录](#12-附录)
+1. [当前实施状态](#1-当前实施状态) ⭐ **NEW**
+2. [重构背景与目标](#2-重构背景与目标)
+3. [技术栈选型](#3-技术栈选型)
+4. [架构设计](#4-架构设计)
+5. [数据库设计](#5-数据库设计)
+6. [API设计](#6-api设计)
+7. [核心业务逻辑迁移](#7-核心业务逻辑迁移)
+8. [前端组件架构](#8-前端组件架构)
+9. [异步任务处理](#9-异步任务处理)
+10. [部署架构](#10-部署架构)
+11. [迁移计划](#11-迁移计划)
+12. [风险评估与缓解](#12-风险评估与缓解)
+13. [附录](#13-附录)
 
 ---
 
-## 1. 重构背景与目标
+## 1. 当前实施状态
 
-### 1.1 当前系统痛点
+> **最后更新**: 2025-11-16
+> **总体进度**: 43% (Phase 0-3 完成)
+> **当前阶段**: Phase 3 Complete ✅
+> **下一步**: Phase 4 - 图片生成系统
+
+### 1.1 进度概览
+
+| Phase | 阶段名称 | 预计时长 | 状态 | 完成日期 |
+|-------|---------|---------|------|----------|
+| **Phase 0** | 项目初始化 | 2-3天 | ✅ **完成** | 2025-11-16 |
+| **Phase 1** | 数据层设计 | 1周 | ✅ **完成** | 2025-11-16 |
+| **Phase 2** | 核心API | 1.5周 | ✅ **完成** | 2025-11-16 |
+| **Phase 3** | UI层 | 1周 | ✅ **完成** | 2025-11-16 |
+| **Phase 4** | 图片生成 | 1.5周 | ⬜ **待开始** | - |
+| **Phase 5** | 高级功能 | 1周 | ⬜ **待开始** | - |
+| **Phase 6** | 测试与部署 | 1.5周 | ⬜ **待开始** | - |
+
+**详细任务追踪**: 参见 [REFRACTOR_TODO.md](./REFRACTOR_TODO.md)
+
+### 1.2 技术栈实际版本
+
+| 技术 | 版本 | 状态 |
+|------|------|------|
+| **Next.js** | 16.0.3 | ✅ Up-to-date |
+| **React** | 19.2.0 | ✅ 最新稳定版 |
+| **TypeScript** | 5.6.3 | ✅ 严格模式 |
+| **Prisma** | 6.0.0 | ✅ 含PostgreSQL |
+| **shadcn/ui** | Latest | ✅ 22组件已安装 |
+| **Tailwind CSS** | 3.4.15 | ✅ CSS变量系统 |
+| **PostgreSQL** | 16-alpine | ✅ Docker运行中 |
+| **Vitest** | 2.1.6 | ✅ 单元测试框架 |
+| **Playwright** | 1.48.2 | ✅ E2E测试框架 |
+
+### 1.3 已完成组件
+
+#### Phase 0: 项目初始化 ✅
+**完成日期**: 2025-11-16
+**关键成果**:
+- Next.js 16.0.3项目搭建（使用Turbopack）
+- 所有依赖配置且版本up-to-date
+- 开发服务器运行 (http://localhost:3000, 374ms启动)
+- **质量优化**:
+  - ✅ 修复`next.config.ts`: 移除deprecated `images.domains`，迁移至`remotePatterns`
+  - ✅ 添加Favicon系统: `/public/favicon.svg` + `/src/app/icon.tsx`
+  - ✅ 修复ESLint 9 flat config语法
+  - ✅ 清理lockfile冲突（删除父目录yarn.lock）
+  - ✅ 零critical warnings（仅HMR connected message）
+
+#### Phase 1: 数据层 ✅
+**完成日期**: 2025-11-16
+**关键成果**:
+- **Prisma Schema**: 7个模型，4个enum，170行代码
+  - 模型: Library, LibraryEntry, Record, Prompt, ImageVariant, Template, ImageBatch
+  - Enum: LibraryType, PromptType, ImageStatus, TemplateType
+- **数据库迁移**:
+  - 6个库已迁移（character, pose, scene, theme, style, decorative_props）
+  - 14个library entries
+  - 2个system templates
+- **Zod Schema**: 5个验证文件，~500行代码
+- **验证脚本**: 数据库连接、迁移验证通过
+
+#### Phase 2: 核心API ✅
+**完成日期**: 2025-11-16
+**代码量**: 27文件，~4,526 LOC
+**关键成果**:
+- **18个API端点**（100%功能测试通过）:
+  - 库管理: 6个端点（list/get/create/update/delete/list-entries）
+  - Prompt生成: 3个端点（generate-main/diff/batch）
+  - Template管理: 5个端点（list/get/create/update/delete）
+  - 工具: 4个端点（health/library-config/generate-id/parse-id）
+- **Template Engine**:
+  - 7个预定义模块（character, pose, scene, theme, lighting, style, composition）
+  - 支持 `{{@module:xxx}}` 和 `{{library.field}}` 语法
+  - 支持过滤器: `join`, `join:`
+  - 39个可用变量（用于主图模板）
+- **测试覆盖**: 12/12集成测试通过（751ms）
+
+#### Phase 3: UI层 ✅
+**完成日期**: 2025-11-16
+**代码量**: 28文件，~4,850 LOC
+**关键成果**:
+- **7个主要页面**:
+  1. `/` - Dashboard（项目概览、快速统计、最近活动）
+  2. `/libraries` - 库管理（列表、创建、编辑、删除）
+  3. `/prompts` - Prompt管理（生成、查看、导出）
+  4. `/images` - 图片管理（批量生成、版本管理）
+  5. `/templates` - 模板管理（系统/用户模板编辑）
+  6. `/status` - 系统状态（健康检查、错误日志）
+  7. `/settings` - 系统设置（配置管理）
+- **8个React Query Hooks**: 数据获取和缓存管理
+- **12个UI组件**:
+  - LibraryTable, PromptCard, BatchGenerationDialog
+  - LoadingSpinner, ErrorMessage, ConfirmDialog
+  - LibraryForm, TemplateEditor, ImageGrid 等
+- **Monaco Editor集成**: 代码分割、语法高亮
+- **响应式设计**: 所有页面支持移动端和桌面端
+- **统一设计**: 所有页面遵循 Header + Stats + Content 布局
+
+### 1.4 待实现功能（Phase 4-6）
+
+#### Phase 4: 图片生成系统 ⬜
+**预计时长**: 1.5周
+**关键任务**:
+- AI Provider实现（Gemini, ByteDance）
+- 三轮生成流程（主图 → 对比图 → 拼接）
+- 图片拼接（sharp库）
+- Provider Fallback机制
+- 多语言文字叠加（7种语言）
+
+#### Phase 5: 高级功能 ⬜
+**预计时长**: 1周
+**关键任务**:
+- 同步管理系统
+- 批量操作（删除、导出）
+- 错误管理与重试
+- 系统健康监控
+
+#### Phase 6: 测试与部署 ⬜
+**预计时长**: 1.5周
+**关键任务**:
+- 单元测试（目标80%覆盖率）
+- 集成测试（API端点）
+- E2E测试（用户流程）
+- Vercel部署配置
+- nginx服务器设置（图片生成）
+- 生产环境优化
+
+### 1.5 与Flask系统对比
+
+| 特性 | Flask (旧) | Next.js (新) | 状态 |
+|------|-----------|-------------|------|
+| **后端框架** | Python Flask | TypeScript Next.js | ✅ 已迁移 |
+| **数据库** | JSON文件 | PostgreSQL + Prisma | ✅ 已迁移 |
+| **前端框架** | Vanilla JS | React 19 + shadcn/ui | ✅ 已迁移 |
+| **类型安全** | 无 | TypeScript全栈 | ✅ 已实现 |
+| **UI组件** | 自定义CSS | shadcn/ui + Tailwind | ✅ 已实现 |
+| **验证** | JSON Schema | Zod | ✅ 已实现 |
+| **Template Engine** | Python模板 | TypeScript重写 | ✅ 已实现 |
+| **图片生成** | Python SDK | REST API封装 | ⬜ 待实现 |
+| **批量任务** | Flask线程 | Server Actions | ⬜ 待实现 |
+| **部署** | 手动 | Vercel + nginx | ⬜ 待实现 |
+
+**Flask系统详细说明**: 参见 [LEGACY_FLASK_REFERENCE.md](./LEGACY_FLASK_REFERENCE.md)
+
+### 1.6 开发环境状态
+
+```bash
+# 开发服务器
+✅ Server: http://localhost:3000
+✅ Start time: 374ms (Turbopack)
+✅ HMR: Connected
+✅ Console: No errors
+
+# 数据库
+✅ PostgreSQL: Running (Docker postgres:16-alpine)
+✅ Prisma Studio: npm run db:studio
+✅ Migrations: 1 migration applied
+
+# 测试
+✅ Unit tests: Vitest configured
+✅ E2E tests: Playwright configured
+✅ Integration: 12/12 passing
+```
+
+### 1.7 下一步行动
+
+**Phase 4 优先任务** (详见 [REFRACTOR_TODO.md](./REFRACTOR_TODO.md)):
+1. 实现 `GeminiProvider` 类（REST API封装）
+2. 实现 `BytedanceProvider` 类
+3. 创建 `ProviderManager`（Fallback逻辑）
+4. 实现图片拼接逻辑（sharp库）
+5. 创建 `/api/images/generate` 端点
+6. 添加批量生成进度追踪
+
+**预计完成时间**: 1.5周（2025-11-30前）
+
+---
+
+## 2. 重构背景与目标
+
+### 2.1 当前系统痛点
 
 #### 技术债务
 - **8,412行无类型JavaScript**: 维护成本高，重构风险大
@@ -47,7 +228,7 @@
 - **状态管理混乱**: 全局变量污染，状态难以追踪
 - **调试困难**: 无Source Map，错误栈难以定位
 
-### 1.2 重构目标
+### 3.2 重构目标
 
 #### 核心目标
 1. **100%类型安全**: TypeScript覆盖所有代码
@@ -64,9 +245,9 @@
 
 ---
 
-## 2. 技术栈选型
+## 3. 技术栈选型
 
-### 2.1 决策总结
+### 3.1 决策总结
 
 | 维度 | 现有技术 | 新技术 | 理由 |
 |------|---------|--------|------|
@@ -81,7 +262,7 @@
 | **部署** | 无 | Vercel + 自托管nginx | Serverless主应用 + 长时间任务隔离 |
 | **测试** | pytest (64%通过) | Vitest + Playwright | 全栈测试覆盖 |
 
-### 2.2 核心依赖
+### 3.2 核心依赖
 
 #### 生产依赖
 ```json
@@ -140,7 +321,7 @@
 
 ---
 
-## 3. 架构设计
+## 4. 架构设计
 
 ### 3.1 整体架构图
 
@@ -453,7 +634,7 @@ promptgen-next/
 
 ---
 
-## 4. 数据库设计
+## 5. 数据库设计
 
 ### 4.1 核心表设计
 
@@ -630,7 +811,7 @@ migrateLibraries()
 
 ---
 
-## 5. API设计
+## 6. API设计
 
 ### 5.1 API端点映射
 
@@ -738,7 +919,7 @@ export async function POST(request: NextRequest) {
 
 ---
 
-## 6. 核心业务逻辑迁移
+## 7. 核心业务逻辑迁移
 
 ### 6.1 Template Engine迁移
 
@@ -1289,7 +1470,7 @@ export class ImageGenerator {
 
 ---
 
-## 7. 前端组件架构
+## 8. 前端组件架构
 
 ### 7.1 shadcn/ui集成
 
@@ -1636,7 +1817,7 @@ export function TemplateEditor({ initialContent, category, onSave }: TemplateEdi
 
 ---
 
-## 8. 异步任务处理
+## 9. 异步任务处理
 
 ### 8.1 设计方案
 
@@ -1808,7 +1989,7 @@ IMAGE_WORKER_URL="https://your-vps.com:3001"  # VPS Worker
 
 ---
 
-## 9. 部署架构
+## 10. 部署架构
 
 ### 9.1 Vercel部署配置
 
@@ -1965,7 +2146,7 @@ services:
 
 ---
 
-## 10. 迁移计划
+## 11. 迁移计划
 
 ### 10.1 时间线（8-10周）
 
@@ -2021,7 +2202,7 @@ services:
 
 ---
 
-## 11. 风险评估与缓解
+## 12. 风险评估与缓解
 
 ### 11.1 技术风险
 
@@ -2116,7 +2297,7 @@ test('complete library management flow', async ({ page }) => {
 
 ---
 
-## 12. 附录
+## 13. 附录
 
 ### 12.1 参考资源
 

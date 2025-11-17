@@ -1,22 +1,22 @@
 # PromptGen Next.js重构任务追踪清单
 # REFRACTOR_TODO.md
 
-**文档版本**: 1.3.0
+**文档版本**: 1.4.0
 **创建日期**: 2025-11-15
 **最后更新**: 2025-11-16
-**状态**: Phase 3 完成 ✅
+**状态**: Phase 3 完成 ✅ (43%总进度)
 
 ---
 
 ## 📊 项目概览
 
-### 技术栈
-- **前端**: Next.js 15 + React 19 + shadcn/ui + Tailwind CSS
-- **后端**: Next.js API Routes + TypeScript
-- **数据库**: PostgreSQL + Prisma ORM
-- **验证**: Zod
-- **测试**: Vitest + Playwright
-- **部署**: Vercel + 自托管nginx
+### 技术栈（实际版本）
+- **前端**: Next.js 16.0.3 + React 19.2.0 + shadcn/ui + Tailwind CSS 3.4.15
+- **后端**: Next.js API Routes + TypeScript 5.6.3
+- **数据库**: PostgreSQL 16-alpine + Prisma 6.0.0
+- **验证**: Zod 3.23.0
+- **测试**: Vitest 2.1.6 + Playwright 1.48.2
+- **部署**: Vercel + 自托管nginx (待实施)
 
 ### 估算工作量
 - **总时长**: 8-10周（全职）
