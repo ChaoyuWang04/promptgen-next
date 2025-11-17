@@ -96,43 +96,50 @@ export async function GET() {
     const variables = await generateVariableMetadata();
 
     return NextResponse.json({
-      variables,
-      total_count: variables.length,
-      filters: [
-        {
-          name: 'join',
-          description: '连接数组元素',
-          usage: '{{array | join}} 或 {{array | join: ", "}}',
-        },
-        {
-          name: 'uppercase',
-          description: '转换为大写',
-          usage: '{{text | uppercase}}',
-        },
-        {
-          name: 'lowercase',
-          description: '转换为小写',
-          usage: '{{text | lowercase}}',
-        },
-        {
-          name: 'first',
-          description: '获取数组前N个元素',
-          usage: '{{array | first: 3}}',
-        },
-        {
-          name: 'default',
-          description: '提供默认值',
-          usage: '{{value | default: "N/A"}}',
-        },
-      ],
+      success: true,
+      data: {
+        variables,
+        total_count: variables.length,
+        filters: [
+          {
+            name: 'join',
+            description: '连接数组元素',
+            usage: '{{array | join}} 或 {{array | join: ", "}}',
+          },
+          {
+            name: 'uppercase',
+            description: '转换为大写',
+            usage: '{{text | uppercase}}',
+          },
+          {
+            name: 'lowercase',
+            description: '转换为小写',
+            usage: '{{text | lowercase}}',
+          },
+          {
+            name: 'first',
+            description: '获取数组前N个元素',
+            usage: '{{array | first: 3}}',
+          },
+          {
+            name: 'default',
+            description: '提供默认值',
+            usage: '{{value | default: "N/A"}}',
+          },
+        ],
+      },
     });
   } catch (error) {
     console.error('[GET /api/prompts/variables] Error:', error);
 
     return NextResponse.json(
       {
-        error: '获取变量列表失败',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '获取变量列表失败',
+          details: { originalError: error instanceof Error ? error.message : 'Unknown error' },
+        },
       },
       { status: 500 }
     );

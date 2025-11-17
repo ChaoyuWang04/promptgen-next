@@ -93,12 +93,20 @@ async function fetchApi<T = unknown>(
     const data: ApiResponse<T> = await response.json();
 
     // Handle API error responses
-    if (!data.success) {
+    if (!data || typeof data !== 'object') {
       throw new ApiError(
-        data.error.code,
-        data.error.message,
-        data.error.details
+        'INVALID_RESPONSE',
+        'Invalid response format from server'
       );
+    }
+
+    if (!data.success) {
+      // Ensure error object exists with proper structure
+      const errorCode = data.error?.code || 'UNKNOWN_ERROR';
+      const errorMessage = data.error?.message || 'An unknown error occurred';
+      const errorDetails = data.error?.details;
+
+      throw new ApiError(errorCode, errorMessage, errorDetails);
     }
 
     return data.data;

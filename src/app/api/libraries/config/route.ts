@@ -51,14 +51,21 @@ export async function GET() {
       total_count: TOTAL_LIBRARIES,
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json({
+      success: true,
+      data: response,
+    });
   } catch (error) {
     console.error('[GET /api/libraries/config] Error:', error);
 
     return NextResponse.json(
       {
-        error: 'Failed to load library configuration',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to load library configuration',
+          details: { originalError: error instanceof Error ? error.message : 'Unknown error' },
+        },
       },
       { status: 500 }
     );

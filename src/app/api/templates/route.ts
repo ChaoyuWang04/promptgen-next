@@ -50,16 +50,23 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      templates,
-      total_count: templates.length,
+      success: true,
+      data: {
+        templates,
+        total_count: templates.length,
+      },
     });
   } catch (error) {
     console.error('[GET /api/templates] Error:', error);
 
     return NextResponse.json(
       {
-        error: '获取模板列表失败',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '获取模板列表失败',
+          details: { originalError: error instanceof Error ? error.message : 'Unknown error' },
+        },
       },
       { status: 500 }
     );
@@ -89,8 +96,12 @@ export async function POST(request: NextRequest) {
     if (!name || !type || !category || !content) {
       return NextResponse.json(
         {
-          error: '缺少必需字段',
-          required: ['name', 'type', 'category', 'content'],
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: '缺少必需字段',
+            details: { required: ['name', 'type', 'category', 'content'] },
+          },
         },
         { status: 400 }
       );
@@ -99,7 +110,13 @@ export async function POST(request: NextRequest) {
     // Validate type
     if (!['SYSTEM', 'USER'].includes(type.toUpperCase())) {
       return NextResponse.json(
-        { error: 'Invalid type. Must be SYSTEM or USER' },
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid type. Must be SYSTEM or USER',
+          },
+        },
         { status: 400 }
       );
     }
@@ -107,7 +124,13 @@ export async function POST(request: NextRequest) {
     // Validate category
     if (!['MAIN', 'DIFF'].includes(category.toUpperCase())) {
       return NextResponse.json(
-        { error: 'Invalid category. Must be MAIN or DIFF' },
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid category. Must be MAIN or DIFF',
+          },
+        },
         { status: 400 }
       );
     }
@@ -119,7 +142,13 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: `模板名称已存在: ${name}` },
+        {
+          success: false,
+          error: {
+            code: 'CONFLICT',
+            message: `模板名称已存在: ${name}`,
+          },
+        },
         { status: 409 }
       );
     }
@@ -153,8 +182,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        error: '创建模板失败',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '创建模板失败',
+          details: { originalError: error instanceof Error ? error.message : 'Unknown error' },
+        },
       },
       { status: 500 }
     );
