@@ -383,6 +383,56 @@
 
 ---
 
+## 🐛 Bug Fixes & Maintenance
+
+### Bug Fix: API Response Format Inconsistencies
+**修复日期**: 2025-11-18
+**状态**: ✅ **RESOLVED**
+
+#### 问题描述
+三个运行时TypeError错误阻止了正常功能使用:
+1. `Cannot read properties of undefined (reading 'image_id')` - Prompt生成后崩溃
+2. `templates?.map is not a function` - 模板列表页面崩溃
+3. `variables?.map is not a function` - 模板编辑器变量参考崩溃
+
+#### 根本原因
+API响应格式不一致，导致前端hooks接收到的数据类型与预期不符:
+- 部分端点返回扁平结构 `{success: true, field1: ..., field2: ...}`
+- 部分端点返回嵌套对象 `{success: true, data: {array: [...], count: ...}}`
+- API客户端统一提取 `data.data`，导致类型不匹配
+
+#### 修复内容
+修改3个API端点以统一响应格式为 `{success: true, data: T}`:
+
+**1. `/src/app/api/prompts/generate/main/route.ts` (line 65-76)**
+- **变更**: 将响应数据包装在 `data` 字段中
+- **影响**: 修复 `useGenerateMainPrompt` hook的 `onSuccess` 回调中的 `data.image_id` 访问错误
+
+**2. `/src/app/api/templates/route.ts` (line 52-55)**
+- **变更**: 返回 `data: templates` (数组) 而非 `data: {templates, total_count}` (对象)
+- **影响**: 修复 `useTemplates` hook期望 `Template[]` 类型的问题，使 `templates?.map()` 正常工作
+
+**3. `/src/app/api/templates/variables/route.ts` (line 158-161)**
+- **变更**: 返回 `data: variables` (数组) 而非 `data: {variables, total_count, category, filters}` (对象)
+- **影响**: 修复 `useTemplateVariables` hook期望 `TemplateVariable[]` 类型的问题，使 `variables?.map()` 正常工作
+
+#### 验证
+- ✅ TypeScript类型检查通过（无新增错误）
+- ✅ API响应格式与前端hooks类型注解完全匹配
+- ✅ 所有修改的端点遵循统一的 `{success: true, data: T}` 标准格式
+
+#### 影响范围
+- **文件修改**: 3个API路由文件
+- **代码变更**: ~30行
+- **受益功能**: Prompt生成、模板管理、模板编辑器
+
+#### 后续建议
+- [ ] 建立API响应格式规范文档
+- [ ] 添加API契约测试以防止格式回归
+- [ ] 审查其他API端点的响应格式一致性
+
+---
+
 ### Phase 6: 测试与部署 🚀
 **目标**: 完善测试覆盖，部署生产环境
 **预计时长**: 1.5周

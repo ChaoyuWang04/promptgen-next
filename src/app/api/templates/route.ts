@@ -51,10 +51,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        templates,
-        total_count: templates.length,
-      },
+      data: templates,
     });
   } catch (error) {
     console.error('[GET /api/templates] Error:', error);

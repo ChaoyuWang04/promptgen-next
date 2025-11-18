@@ -157,38 +157,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        variables,
-        total_count: variables.length,
-        category: type || 'ALL',
-        filters: [
-          {
-            name: 'join',
-            description: '连接数组元素',
-            usage: '{{array | join}} 或 {{array | join: ", "}}',
-          },
-          {
-            name: 'uppercase',
-            description: '转换为大写',
-            usage: '{{text | uppercase}}',
-          },
-          {
-            name: 'lowercase',
-            description: '转换为小写',
-            usage: '{{text | lowercase}}',
-          },
-          {
-            name: 'first',
-            description: '获取数组前N个元素',
-            usage: '{{array | first: 3}}',
-          },
-          {
-            name: 'default',
-            description: '提供默认值',
-            usage: '{{value | default: "N/A"}}',
-          },
-        ],
-      },
+      data: variables,
     });
   } catch (error) {
     console.error('[GET /api/templates/variables] Error:', error);

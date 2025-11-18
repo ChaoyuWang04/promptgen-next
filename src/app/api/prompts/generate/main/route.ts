@@ -64,13 +64,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      image_id: result.image_id,
-      prompt_cn: result.prompt_cn,
-      prompt_en: result.prompt_en || null,
-      library_ids: result.library_ids,
-      outfit_minor_state: result.outfit_minor_state,
-      used_decorations: result.used_decorations,
-      generated_at: result.generated_at,
+      data: {
+        image_id: result.image_id,
+        prompt_cn: result.prompt_cn,
+        prompt_en: result.prompt_en || null,
+        library_ids: result.library_ids,
+        outfit_minor_state: result.outfit_minor_state,
+        used_decorations: result.used_decorations,
+        generated_at: result.generated_at,
+      },
     });
   } catch (error) {
     console.error('[POST /api/prompts/generate/main] Error:', error);
