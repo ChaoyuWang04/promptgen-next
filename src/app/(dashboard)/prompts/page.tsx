@@ -223,7 +223,7 @@ export default function PromptsPage() {
                     <div>
                       <Label className="text-xs text-muted-foreground">中文Prompt</Label>
                       <Textarea
-                        value={mainResult.prompt_cn}
+                        value={mainResult.prompt_cn ?? ''}
                         readOnly
                         className="mt-2 min-h-[300px] font-mono text-sm"
                       />
@@ -231,7 +231,7 @@ export default function PromptsPage() {
                     <div>
                       <Label className="text-xs text-muted-foreground">英文Prompt</Label>
                       <Textarea
-                        value={mainResult.prompt_en}
+                        value={mainResult.prompt_en ?? ''}
                         readOnly
                         className="mt-2 min-h-[200px] font-mono text-sm"
                       />

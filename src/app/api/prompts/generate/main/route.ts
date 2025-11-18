@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       data: {
         image_id: result.image_id,
         prompt_cn: result.prompt_cn,
-        prompt_en: result.prompt_en || null,
+        prompt_en: result.prompt_en || '',
         library_ids: result.library_ids,
         outfit_minor_state: result.outfit_minor_state,
         used_decorations: result.used_decorations,

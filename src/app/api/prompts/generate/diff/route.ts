@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       diff_id: result.diff_id,
       image_id: result.image_id,
       prompt_cn: result.prompt_cn,
-      prompt_en: result.prompt_en || null,
+      prompt_en: result.prompt_en || '',
       new_outfit_state: result.new_outfit_state,
       new_decorations: result.new_decorations,
       generated_at: result.generated_at,
