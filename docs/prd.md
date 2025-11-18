@@ -1,11 +1,11 @@
 # PromptGen 全量重构设计文档
 # Next.js + TypeScript + shadcn/ui + Zod + PostgreSQL
 
-**文档版本**: 1.2.0
+**文档版本**: 1.3.0
 **创建日期**: 2025-11-15
 **最后更新**: 2025-11-18
 **作者**: Claude + Sam Wong
-**状态**: 实施中（43%完成 - Phase 3 Complete）
+**状态**: 实施中（71%完成 - Phase 5 Complete）
 
 ---
 
@@ -27,9 +27,9 @@
 ## 1. 当前实施状态
 
 > **最后更新**: 2025-11-18
-> **总体进度**: 43% (Phase 0-3 完成)
-> **当前阶段**: Phase 3 Complete ✅
-> **下一步**: Phase 4 - 图片生成系统
+> **总体进度**: 71% (Phase 0-5 完成)
+> **当前阶段**: Phase 5 Complete ✅
+> **下一步**: Phase 6 - 测试与部署
 
 ### 1.1 进度概览
 
@@ -39,8 +39,8 @@
 | **Phase 1** | 数据层设计 | 1周 | ✅ **完成** | 2025-11-16 |
 | **Phase 2** | 核心API | 1.5周 | ✅ **完成** | 2025-11-16 |
 | **Phase 3** | UI层 | 1周 | ✅ **完成** | 2025-11-16 |
-| **Phase 4** | 图片生成 | 1.5周 | ⬜ **待开始** | - |
-| **Phase 5** | 高级功能 | 1周 | ⬜ **待开始** | - |
+| **Phase 4** | 图片生成 | 1.5周 | ✅ **完成** | 2025-11-18 |
+| **Phase 5** | 高级功能 | 1周 | ✅ **完成** | 2025-11-18 |
 | **Phase 6** | 测试与部署 | 1.5周 | ⬜ **待开始** | - |
 
 **详细任务追踪**: 参见 [todo.md](./todo.md)
@@ -124,24 +124,60 @@
 - **响应式设计**: 所有页面支持移动端和桌面端
 - **统一设计**: 所有页面遵循 Header + Stats + Content 布局
 
-### 1.4 待实现功能（Phase 4-6）
+### 1.4 已完成核心功能（Phase 4-5）
 
-#### Phase 4: 图片生成系统 ⬜
-**预计时长**: 1.5周
-**关键任务**:
-- AI Provider实现（Gemini, ByteDance）
-- 三轮生成流程（主图 → 对比图 → 拼接）
-- 图片拼接（sharp库）
-- Provider Fallback机制
-- 多语言文字叠加（7种语言）
+#### Phase 4: 图片生成系统 ✅
+**完成日期**: 2025-11-18
+**代码量**: ~3,200 LOC, 22 files
+**关键成果**:
+- **AI Provider实现**:
+  - GeminiProvider（REST API封装）
+  - BytedanceProvider（REST API封装）
+  - ProviderManager（Fallback机制，自动切换）
+- **图片生成流程**:
+  - ImageGenerator（3轮生成协调）
+  - BatchGenerator（批量任务管理）
+  - ComboManager（组合枚举）
+- **图片拼接系统**:
+  - ImageStitcher（sharp库，主图+对比图拼接）
+  - TextOverlay（7种语言文字叠加）
+  - Languages配置（en, fr, ja, ko, de, es, zh）
+- **BullMQ队列集成**:
+  - image-generation-queue（任务队列）
+  - Worker进程（后台任务处理）
+  - 进度追踪（实时状态更新）
+- **API端点**:
+  - `/api/images/generate/single` - 单图生成
+  - `/api/images/generate/batch` - 批量生成
+  - `/api/images/stitch` - 图片拼接
+  - `/api/images/progress/[imageId]` - 进度查询
 
-#### Phase 5: 高级功能 ⬜
-**预计时长**: 1周
-**关键任务**:
-- 同步管理系统
-- 批量操作（删除、导出）
-- 错误管理与重试
-- 系统健康监控
+#### Phase 5: 高级功能 ✅
+**完成日期**: 2025-11-18
+**代码量**: ~4,500 LOC, 33 files
+**关键成果**:
+- **错误管理系统**（8 files）:
+  - ErrorLogger（集中式错误日志）
+  - ErrorClassifier（8种错误分类）
+  - Error API（查询、统计、清理）
+  - ErrorLogViewer & ErrorStats组件
+- **健康监控系统**（7 files）:
+  - HealthChecker（系统健康检查）
+  - Provider/Database/Queue/FileSystem监控
+  - Health API（统一健康端点）
+  - HealthStatusCard & ProviderStatus & QueueStatus组件
+- **同步管理系统**（16 files）:
+  - SyncManager（协调8个检查器）
+  - 8个IChecker实现（库配置、无效引用、Prompt同步、图片同步、组合状态、字段完整性、孤立记录、重复检测）
+  - 自动修复能力（安全问题自动修复）
+  - Sync API（检查、修复、历史）
+  - SyncDashboard & SyncCheckList组件
+- **批量操作系统**（5 files）:
+  - 批量删除API（级联删除选项）
+  - Prompt导出（JSON/TXT/ZIP格式）
+  - JSONExporter & ZIPBuilder工具类
+
+### 1.5 待实现功能（Phase 6）
 
 #### Phase 6: 测试与部署 ⬜
 **预计时长**: 1.5周
@@ -153,7 +189,7 @@
 - nginx服务器设置（图片生成）
 - 生产环境优化
 
-### 1.5 与Flask系统对比
+### 1.6 与Flask系统对比
 
 | 特性 | Flask (旧) | Next.js (新) | 状态 |
 |------|-----------|-------------|------|
@@ -164,23 +200,28 @@
 | **UI组件** | 自定义CSS | shadcn/ui + Tailwind | ✅ 已实现 |
 | **验证** | JSON Schema | Zod | ✅ 已实现 |
 | **Template Engine** | Python模板 | TypeScript重写 | ✅ 已实现 |
-| **图片生成** | Python SDK | REST API封装 | ⬜ 待实现 |
-| **批量任务** | Flask线程 | Server Actions | ⬜ 待实现 |
+| **图片生成** | Python SDK | REST API封装 + BullMQ | ✅ 已实现 |
+| **批量任务** | Flask线程 | BullMQ队列 | ✅ 已实现 |
+| **错误管理** | 无 | ErrorLogger + 分类系统 | ✅ 已实现 |
+| **健康监控** | 无 | 统一健康检查 | ✅ 已实现 |
+| **同步管理** | 无 | 8个检查器 + 自动修复 | ✅ 已实现 |
 | **部署** | 手动 | Vercel + nginx | ⬜ 待实现 |
 
 **Flask系统详细说明**: 参见 [LEGACY_FLASK_REFERENCE.md](./LEGACY_FLASK_REFERENCE.md)
 
-### 1.6 下一步行动
+### 1.7 下一步行动
 
-**Phase 4 优先任务** (详见 [todo.md](./todo.md)):
-1. 实现 `GeminiProvider` 类（REST API封装）
-2. 实现 `BytedanceProvider` 类
-3. 创建 `ProviderManager`（Fallback逻辑）
-4. 实现图片拼接逻辑（sharp库）
-5. 创建 `/api/images/generate` 端点
-6. 添加批量生成进度追踪
+**Phase 6 优先任务** (详见 [todo.md](./todo.md)):
+1. 编写Template Engine单元测试（目标80%覆盖率）
+2. 编写Generator单元测试
+3. 编写Utility工具单元测试
+4. 实现API端点集成测试
+5. 编写E2E测试（库管理、Prompt生成、图片生成流程）
+6. Vercel部署配置
+7. nginx图片服务器设置
+8. 性能优化与监控告警
 
-**预计完成时间**: 1.5周（2025-11-30前）
+**预计完成时间**: 1.5周（2025-12-02前）
 
 ---
 
@@ -590,9 +631,9 @@
 | **Week 1-2** | Phase 0-1 | 项目初始化 + 数据层 | ✅ 已完成 |
 | **Week 3-4** | Phase 2 | 核心API + Template Engine | ✅ 已完成 |
 | **Week 5** | Phase 3 | UI层 + React组件 | ✅ 已完成 |
-| **Week 6-7** | Phase 4 | 图片生成系统 | 🔄 进行中 |
-| **Week 8** | Phase 5 | 高级功能 | ⬜ 待开始 |
-| **Week 9-10** | Phase 6 | 测试与部署 | ⬜ 待开始 |
+| **Week 6-7** | Phase 4 | 图片生成系统 | ✅ 已完成 |
+| **Week 8** | Phase 5 | 高级功能 | ✅ 已完成 |
+| **Week 9-10** | Phase 6 | 测试与部署 | 🔄 进行中 |
 
 ### 8.2 依赖关系
 
