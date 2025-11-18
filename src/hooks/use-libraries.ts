@@ -39,12 +39,14 @@ interface LibraryConfigApiResponse {
     order: number;
     structure_type: 'standard' | 'nested_array';
     description?: string;
+    is_active: boolean;
+    entry_count: number;
   }>;
   total_count: number;
 }
 
 interface LibraryConfigResponse {
-  enabled_libraries: LibraryConfig[];
+  enabled_libraries: Array<LibraryConfig & { entryCount: number; isActive: boolean }>;
   total_count: number;
 }
 
@@ -66,6 +68,8 @@ export function useLibraryConfig() {
           order: lib.order,
           structureType: lib.structure_type,
           description: lib.description,
+          isActive: lib.is_active,
+          entryCount: lib.entry_count,
         })),
         total_count: response.total_count,
       };

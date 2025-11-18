@@ -43,9 +43,17 @@ interface LibraryTableProps {
   libraryName: string;
   displayField: string;
   searchQuery?: string;
+  onView?: (entryId: string) => void;
+  onEdit?: (entryId: string) => void;
 }
 
-export function LibraryTable({ libraryName, displayField, searchQuery = '' }: LibraryTableProps) {
+export function LibraryTable({
+  libraryName,
+  displayField,
+  searchQuery = '',
+  onView,
+  onEdit,
+}: LibraryTableProps) {
   const { data: library, isLoading } = useLibrary(libraryName);
   const deleteMutation = useDeleteLibraryEntry();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -143,11 +151,17 @@ export function LibraryTable({ libraryName, displayField, searchQuery = '' }: Li
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onView?.(entry.id)}
+                        disabled={!onView}
+                      >
                         <Eye className="mr-2 h-4 w-4" />
                         查看详情
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onEdit?.(entry.id)}
+                        disabled={!onEdit}
+                      >
                         <Pencil className="mr-2 h-4 w-4" />
                         编辑
                       </DropdownMenuItem>
