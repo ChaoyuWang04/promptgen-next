@@ -144,9 +144,9 @@ export default function ImagesPage() {
                     <div className="flex items-center gap-2">
                       <Badge
                         variant={
-                          batch.status === 'completed'
+                          batch.status === 'COMPLETED'
                             ? 'default'
-                            : batch.status === 'failed'
+                            : batch.status === 'FAILED'
                             ? 'destructive'
                             : 'secondary'
                         }
@@ -158,18 +158,18 @@ export default function ImagesPage() {
                       </span>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {formatRelativeTime(batch.created_at)}
+                      {formatRelativeTime(batch.createdAt)}
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">进度</span>
                       <span className="font-medium">
-                        {batch.completed + batch.failed} / {batch.total}
+                        {batch.completed + batch.failed} / {batch.totalImages}
                       </span>
                     </div>
                     <Progress
-                      value={((batch.completed + batch.failed) / batch.total) * 100}
+                      value={((batch.completed + batch.failed) / batch.totalImages) * 100}
                     />
                     <div className="flex gap-4 text-xs text-muted-foreground">
                       <span>

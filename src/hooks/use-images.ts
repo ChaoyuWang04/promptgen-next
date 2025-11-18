@@ -18,35 +18,58 @@ export interface ImageStats {
 
 export interface ImageBatch {
   id: string;
-  image_ids: string[];
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  imageIds: string[];
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
   completed: number;
   failed: number;
-  total: number;
-  created_at: string;
-  updated_at: string;
+  totalImages: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BatchProgress {
-  batch_id: string;
-  status: string;
+  batchId: string;
+  totalImages: number;
   completed: number;
   failed: number;
-  total: number;
-  current_image_id?: string;
-  current_provider?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  progress: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GenerateSingleRequest {
+  imageId: string;
+  languageIds?: number[];
+  overwrite?: boolean;
 }
 
 export interface GenerateBatchRequest {
-  language_id?: number;
-  provider?: string;
-  library_filter?: {
-    character_ids?: string[];
-    pose_ids?: string[];
-    scene_ids?: string[];
-    theme_ids?: string[];
-    style_ids?: string[];
+  // Direct mode: Provide imageIds array
+  imageIds?: string[];
+
+  // Filter mode: Use library filters to enumerate combinations
+  libraryFilter?: {
+    character?: string[];
+    pose?: string[];
+    scene?: string[];
+    theme?: string[];
+    style?: string[];
   };
+
+  // For filter mode: Which combinations to generate
+  mode?: 'all' | 'ungenerated' | 'unimaged';
+
+  // Generation options
+  languageIds?: number[];
+  concurrency?: number;
+  continueOnError?: boolean;
+}
+
+export interface ManualStitchRequest {
+  imageId: string;
+  version?: string;
+  languageIds?: number[];
 }
 
 /**
@@ -55,7 +78,26 @@ export interface GenerateBatchRequest {
 export function useImageStats() {
   return useQuery<ImageStats>({
     queryKey: queryKeys.images.stats(),
-    queryFn: () => api.get<ImageStats>('/api/images/stats'),
+    queryFn: async () => {
+      // API returns snake_case fields
+      const apiResponse = await api.get<{
+        total_records: number;
+        completed_images: number;
+        pending_images: number;
+        total_variants: number;
+        recent_images_7d: number;
+        by_provider: Record<string, number>;
+      }>('/api/images/stats');
+
+      // Transform to expected format
+      return {
+        total_images: apiResponse.total_records || 0,
+        completed: apiResponse.completed_images || 0,
+        pending: apiResponse.pending_images || 0,
+        failed: 0, // Not provided by API yet
+        by_provider: apiResponse.by_provider || {},
+      };
+    },
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 }
@@ -66,7 +108,16 @@ export function useImageStats() {
 export function useImageBatches() {
   return useQuery<ImageBatch[]>({
     queryKey: queryKeys.images.batches(),
-    queryFn: () => api.get<ImageBatch[]>('/api/images/batches'),
+    queryFn: async () => {
+      // API returns {batches: [], pagination: {...}}
+      const apiResponse = await api.get<{
+        batches: ImageBatch[];
+        pagination: any;
+      }>('/api/images/batches');
+
+      // Return just the batches array
+      return apiResponse.batches || [];
+    },
   });
 }
 
@@ -76,9 +127,52 @@ export function useImageBatches() {
 export function useBatchProgress(batchId: string | null) {
   return useQuery<BatchProgress>({
     queryKey: queryKeys.images.batchProgress(batchId || ''),
-    queryFn: () => api.get<BatchProgress>(`/api/images/batches/${batchId}/progress`),
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: BatchProgress }>(
+        `/api/images/generate/batch/${batchId}`
+      );
+      return response.data;
+    },
     enabled: !!batchId,
     refetchInterval: 2000, // Poll every 2 seconds when active
+  });
+}
+
+/**
+ * Hook to generate a single image
+ */
+export function useGenerateSingle() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: GenerateSingleRequest) =>
+      api.post<{
+        success: boolean;
+        data: {
+          imageId: string;
+          version: string;
+          provider: string;
+          paths: Record<string, string>;
+          totalTimeMs: number;
+          languagesGenerated: number;
+        };
+        message: string;
+      }>('/api/images/generate/single', request),
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.images.all });
+      toast({
+        title: 'Image Generated',
+        description: `Successfully generated ${response.data.languagesGenerated} language variant(s) for ${variables.imageId}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Generation Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 }
 
@@ -91,17 +185,64 @@ export function useGenerateBatch() {
 
   return useMutation({
     mutationFn: (request: GenerateBatchRequest) =>
-      api.post<{ batch_id: string; total: number }>('/api/images/generate/batch', request),
-    onSuccess: (data) => {
+      api.post<{
+        success: boolean;
+        data: {
+          batchId: string;
+          totalImages: number;
+          completed: number;
+          failed: number;
+          durationMs: number;
+          errors: Array<{ imageId: string; error: string }>;
+        };
+        message: string;
+      }>('/api/images/generate/batch', request),
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.images.batches() });
       toast({
-        title: '批量生成已开始',
-        description: `共 ${data.total} 个图片，批次ID: ${data.batch_id}`,
+        title: 'Batch Generation Complete',
+        description: `${response.data.completed}/${response.data.totalImages} succeeded, ${response.data.failed} failed`,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: '批量生成失败',
+        title: 'Batch Generation Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to manually stitch existing images
+ */
+export function useManualStitch() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (request: ManualStitchRequest) =>
+      api.post<{
+        success: boolean;
+        data: {
+          imageId: string;
+          version: string;
+          paths: Record<string, string>;
+          languagesGenerated: number;
+        };
+        message: string;
+      }>('/api/images/stitch', request),
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.images.all });
+      toast({
+        title: 'Stitch Complete',
+        description: `Successfully stitched ${response.data.languagesGenerated} language variant(s) for ${variables.imageId}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Stitch Failed',
         description: error.message,
         variant: 'destructive',
       });

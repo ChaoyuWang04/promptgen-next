@@ -30,6 +30,19 @@ export interface Library {
   schema?: Record<string, unknown>;
 }
 
+interface LibraryConfigApiResponse {
+  enabled_libraries: Array<{
+    name: string;
+    display_name: string;
+    display_field: string;
+    type: 'required' | 'optional';
+    order: number;
+    structure_type: 'standard' | 'nested_array';
+    description?: string;
+  }>;
+  total_count: number;
+}
+
 interface LibraryConfigResponse {
   enabled_libraries: LibraryConfig[];
   total_count: number;
@@ -41,7 +54,22 @@ interface LibraryConfigResponse {
 export function useLibraryConfig() {
   return useQuery<LibraryConfigResponse>({
     queryKey: queryKeys.libraries.config(),
-    queryFn: () => api.get<LibraryConfigResponse>('/api/libraries/config'),
+    queryFn: async () => {
+      const response = await api.get<LibraryConfigApiResponse>('/api/libraries/config');
+      // Transform snake_case API response to camelCase for frontend
+      return {
+        enabled_libraries: response.enabled_libraries.map((lib) => ({
+          name: lib.name,
+          displayName: lib.display_name,
+          displayField: lib.display_field,
+          type: lib.type,
+          order: lib.order,
+          structureType: lib.structure_type,
+          description: lib.description,
+        })),
+        total_count: response.total_count,
+      };
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -52,7 +80,31 @@ export function useLibraryConfig() {
 export function useLibrary(libraryName: string) {
   return useQuery<Library>({
     queryKey: queryKeys.libraries.list(libraryName),
-    queryFn: () => api.get<Library>(`/api/libraries/${libraryName}`),
+    queryFn: async () => {
+      // API returns just the entries object
+      const rawEntries = await api.get<any>(`/api/libraries/${libraryName}`);
+
+      // Transform nested_array structure (decorative_props) to standard object format
+      let entries: Record<string, LibraryEntry>;
+
+      if (rawEntries.common_props && Array.isArray(rawEntries.common_props)) {
+        // Convert array to object keyed by id
+        entries = rawEntries.common_props.reduce((acc: Record<string, LibraryEntry>, item: LibraryEntry) => {
+          acc[item.id] = item;
+          return acc;
+        }, {});
+      } else {
+        // Standard object structure
+        entries = rawEntries;
+      }
+
+      // Transform to Library format expected by components
+      return {
+        name: libraryName,
+        displayName: libraryName, // Will be properly set from config if needed
+        entries,
+      };
+    },
     enabled: !!libraryName,
   });
 }

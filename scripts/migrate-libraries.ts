@@ -48,8 +48,8 @@ const LIBRARIES = [
   },
 ];
 
-// Path to the data directory (promptgen-next/data/)
-const DATA_DIR = path.resolve(__dirname, '../data');
+// Path to the data directory (promptgen-next/context/old project/data/)
+const DATA_DIR = path.resolve(__dirname, '../context/old project/data');
 
 async function loadLibraryData(fileName: string): Promise<Record<string, any>> {
   const filePath = path.join(DATA_DIR, fileName);

@@ -41,83 +41,150 @@ const LANGUAGES = [
   { id: 4, name: '韩语', code: 'ko' },
   { id: 5, name: '德语', code: 'de' },
   { id: 6, name: '西班牙语', code: 'es' },
-  { id: 7, name: '繁体中文', code: 'zh' },
-];
-
-const PROVIDERS = [
-  { id: 'gemini', name: 'Google Gemini' },
-  { id: 'bytedance', name: '字节跳动' },
+  { id: 7, name: '中文', code: 'zh' },
 ];
 
 export function BatchGenerationDialog({ open, onOpenChange }: BatchGenerationDialogProps) {
   const generateBatch = useGenerateBatch();
-  const [languageId, setLanguageId] = useState<number>(1);
-  const [provider, setProvider] = useState<string>('');
+  const [selectedLanguages, setSelectedLanguages] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
+  const [mode, setMode] = useState<'all' | 'ungenerated' | 'unimaged'>('ungenerated');
   const [useFilter, setUseFilter] = useState(false);
+  const [continueOnError, setContinueOnError] = useState(true);
+
+  const toggleLanguage = (langId: number) => {
+    setSelectedLanguages((prev) =>
+      prev.includes(langId)
+        ? prev.filter((id) => id !== langId)
+        : [...prev, langId].sort()
+    );
+  };
+
+  const selectAllLanguages = () => {
+    setSelectedLanguages([1, 2, 3, 4, 5, 6, 7]);
+  };
+
+  const deselectAllLanguages = () => {
+    setSelectedLanguages([]);
+  };
 
   const handleGenerate = async () => {
+    if (selectedLanguages.length === 0) {
+      return; // Need at least one language
+    }
+
     await generateBatch.mutateAsync({
-      language_id: languageId,
-      provider: provider || undefined,
-      library_filter: useFilter ? {} : undefined,
+      languageIds: selectedLanguages,
+      mode: mode,
+      libraryFilter: useFilter ? {} : undefined,
+      continueOnError: continueOnError,
+      concurrency: 1, // Sequential processing for safety
     });
     onOpenChange(false);
     // Reset state
-    setLanguageId(1);
-    setProvider('');
+    setSelectedLanguages([1, 2, 3, 4, 5, 6, 7]);
+    setMode('ungenerated');
     setUseFilter(false);
+    setContinueOnError(true);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>批量生成图片</DialogTitle>
           <DialogDescription>
-            配置批量生成参数。系统将自动生成所有待生成的组合。
+            配置批量生成参数。系统将使用 Gemini 和 ByteDance 自动生成图片。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Mode Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="mode">生成模式</Label>
+            <Select
+              value={mode}
+              onValueChange={(value) => setMode(value as 'all' | 'ungenerated' | 'unimaged')}
+            >
+              <SelectTrigger id="mode">
+                <SelectValue placeholder="选择模式" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ungenerated">
+                  仅未生成 (推荐) - 跳过已有记录的组合
+                </SelectItem>
+                <SelectItem value="unimaged">
+                  仅无图片 - 已有提示词但无图片的组合
+                </SelectItem>
+                <SelectItem value="all">
+                  全部 - 生成所有组合 (谨慎使用)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Language Selection */}
           <div className="space-y-2">
-            <Label htmlFor="language">目标语言</Label>
-            <Select
-              value={String(languageId)}
-              onValueChange={(value) => setLanguageId(Number(value))}
-            >
-              <SelectTrigger id="language">
-                <SelectValue placeholder="选择语言" />
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.id} value={String(lang.id)}>
+            <div className="flex items-center justify-between">
+              <Label>目标语言</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAllLanguages}
+                  className="h-auto py-1 text-xs"
+                >
+                  全选
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={deselectAllLanguages}
+                  className="h-auto py-1 text-xs"
+                >
+                  清空
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 rounded-lg border p-4">
+              {LANGUAGES.map((lang) => (
+                <div key={lang.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`lang-${lang.id}`}
+                    checked={selectedLanguages.includes(lang.id)}
+                    onCheckedChange={() => toggleLanguage(lang.id)}
+                  />
+                  <label
+                    htmlFor={`lang-${lang.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
                     {lang.name} ({lang.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </label>
+                </div>
+              ))}
+            </div>
+            {selectedLanguages.length === 0 && (
+              <p className="text-xs text-red-500">请至少选择一种语言</p>
+            )}
           </div>
 
-          {/* Provider Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="provider">AI Provider (可选)</Label>
-            <Select value={provider} onValueChange={setProvider}>
-              <SelectTrigger id="provider">
-                <SelectValue placeholder="自动选择" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">自动选择</SelectItem>
-                {PROVIDERS.map((prov) => (
-                  <SelectItem key={prov.id} value={prov.id}>
-                    {prov.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Continue on Error Option */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="continue-on-error"
+              checked={continueOnError}
+              onCheckedChange={(checked) => setContinueOnError(checked as boolean)}
+            />
+            <label
+              htmlFor="continue-on-error"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              遇到错误继续执行 (推荐)
+            </label>
           </div>
 
-          {/* Filter Option */}
+          {/* Filter Option (Placeholder for future) */}
           <div className="flex items-center space-x-2">
             <Checkbox
               id="use-filter"
@@ -145,8 +212,8 @@ export function BatchGenerationDialog({ open, onOpenChange }: BatchGenerationDia
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              批量生成可能需要较长时间。生成过程中可以关闭此对话框，
-              系统将在后台继续执行。
+              批量生成可能需要较长时间。每张图片需要经过 3 轮生成：
+              主图 → 差分图 → 多语言拼接。失败的图片会自动使用备用 Provider 重试。
             </AlertDescription>
           </Alert>
         </div>
@@ -155,7 +222,10 @@ export function BatchGenerationDialog({ open, onOpenChange }: BatchGenerationDia
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
-          <Button onClick={handleGenerate} disabled={generateBatch.isPending}>
+          <Button
+            onClick={handleGenerate}
+            disabled={generateBatch.isPending || selectedLanguages.length === 0}
+          >
             {generateBatch.isPending ? (
               <>
                 <LoadingSpinner size="sm" className="mr-2" />
@@ -164,7 +234,7 @@ export function BatchGenerationDialog({ open, onOpenChange }: BatchGenerationDia
             ) : (
               <>
                 <Play className="mr-2 h-4 w-4" />
-                开始生成
+                开始生成 ({selectedLanguages.length} 语言)
               </>
             )}
           </Button>
