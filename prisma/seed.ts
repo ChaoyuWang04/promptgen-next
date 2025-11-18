@@ -7,6 +7,9 @@
  */
 
 import { prisma } from '../src/lib/db/prisma';
+import { LIBRARY_TEMPLATES } from '../src/lib/templates/library-templates';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // System templates content
 const MAIN_TEMPLATE_DEFAULT = `角色: {{character.name}}
@@ -64,6 +67,82 @@ async function seedTemplates() {
     console.log('  ✅ Templates seeded successfully');
   } catch (error) {
     console.error('  ❌ Error seeding templates:', error);
+    throw error;
+  }
+}
+
+async function seedLibraries() {
+  console.log('\n🌱 Seeding libraries...');
+
+  try {
+    // Check if we already have libraries
+    const existingCount = await prisma.library.count();
+
+    if (existingCount > 0) {
+      console.log(`  ℹ️  Database already has ${existingCount} libraries`);
+      console.log('  ℹ️  Updating existing libraries with new fields...');
+    }
+
+    // Seed libraries from templates
+    for (const template of LIBRARY_TEMPLATES) {
+      // Try to load data from context/old project/data if exists
+      let entries: any = {};
+      const dataPath = path.join(process.cwd(), 'context', 'old project', 'data', `${template.name}.json`);
+
+      if (fs.existsSync(dataPath)) {
+        try {
+          const fileContent = fs.readFileSync(dataPath, 'utf-8');
+          entries = JSON.parse(fileContent);
+          console.log(`  ✓ Loaded ${template.name} data from file`);
+        } catch (error) {
+          console.log(`  ⚠️  Could not load ${template.name} data file, using empty entries`);
+          entries = template.structureType === 'nested_array' ? template.exampleEntry : {};
+        }
+      } else {
+        entries = template.structureType === 'nested_array' ? template.exampleEntry : {};
+      }
+
+      // Upsert library
+      const library = await prisma.library.upsert({
+        where: { name: template.name },
+        update: {
+          // Update metadata fields while preserving existing entries
+          displayName: template.displayName,
+          description: template.description,
+          displayField: template.displayField,
+          category: template.category,
+          schema: template.schema as any,
+          schemaVersion: '1.0',
+          isActive: true,
+          metadata: {
+            createdFrom: 'template',
+            structureType: template.structureType,
+          },
+        },
+        create: {
+          name: template.name,
+          displayName: template.displayName,
+          description: template.description,
+          displayField: template.displayField,
+          category: template.category,
+          order: LIBRARY_TEMPLATES.indexOf(template),
+          entries: entries as any,
+          schema: template.schema as any,
+          schemaVersion: '1.0',
+          isActive: true,
+          metadata: {
+            createdFrom: 'template',
+            structureType: template.structureType,
+          },
+        },
+      });
+
+      console.log(`  ✓ Created/updated library: ${library.displayName} (${library.name})`);
+    }
+
+    console.log('  ✅ Libraries seeded successfully');
+  } catch (error) {
+    console.error('  ❌ Error seeding libraries:', error);
     throw error;
   }
 }
@@ -126,6 +205,9 @@ async function main() {
     // Seed templates
     await seedTemplates();
 
+    // Seed libraries
+    await seedLibraries();
+
     // Seed sample records (optional)
     // await seedSampleRecords();
 
@@ -133,10 +215,12 @@ async function main() {
 
     // Display summary
     const templateCount = await prisma.template.count();
+    const libraryCount = await prisma.library.count();
     const recordCount = await prisma.record.count();
 
     console.log(`\n📊 Summary:`);
     console.log(`  Templates: ${templateCount}`);
+    console.log(`  Libraries: ${libraryCount}`);
     console.log(`  Records: ${recordCount}`);
   } catch (error) {
     console.error('\n❌ Seed failed:', error);

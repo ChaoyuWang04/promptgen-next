@@ -274,3 +274,204 @@ export function useValidateLibraryEntry() {
     },
   });
 }
+
+// ========================================
+// Library Management Hooks (New)
+// ========================================
+
+export interface LibraryTemplate {
+  name: string;
+  displayName: string;
+  description: string;
+  displayField: string;
+  category?: string;
+  structureType: 'standard' | 'nested_array';
+  schema: Record<string, unknown>;
+  exampleEntry: Record<string, unknown>;
+}
+
+export interface LibraryStats {
+  name: string;
+  displayName: string;
+  description?: string;
+  displayField: string;
+  category?: string;
+  entryCount: number;
+  schemaVersion: string;
+  isActive: boolean;
+  structureType: 'standard' | 'nested_array';
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Hook to fetch all library templates
+ */
+export function useLibraryTemplates() {
+  return useQuery<LibraryTemplate[]>({
+    queryKey: queryKeys.libraries.templates(),
+    queryFn: async () => {
+      const response = await api.get<{ data: LibraryTemplate[] }>('/api/libraries/templates');
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes (templates rarely change)
+  });
+}
+
+/**
+ * Hook to create a new library
+ */
+export function useCreateLibrary() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      displayName: string;
+      description?: string;
+      displayField?: string;
+      category?: string;
+      order?: number;
+      templateName?: string;
+      schema?: Record<string, unknown>;
+      entries?: Record<string, unknown> | unknown[];
+    }) => api.post('/api/libraries', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.all() });
+      toast({
+        title: '创建成功',
+        description: '新库已创建',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '创建失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to update library metadata
+ */
+export function useUpdateLibrary() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({
+      name,
+      data,
+    }: {
+      name: string;
+      data: {
+        displayName?: string;
+        description?: string;
+        displayField?: string;
+        category?: string;
+        order?: number;
+        schema?: Record<string, unknown>;
+        isActive?: boolean;
+      };
+    }) => api.patch(`/api/libraries/${name}`, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.list(variables.name) });
+      toast({
+        title: '更新成功',
+        description: '库配置已更新',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '更新失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to delete a library
+ */
+export function useDeleteLibrary() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (libraryName: string) => api.delete(`/api/libraries/${libraryName}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.all() });
+      toast({
+        title: '删除成功',
+        description: '库已删除',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '删除失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to fetch library statistics
+ */
+export function useLibraryStats(libraryName: string) {
+  return useQuery<LibraryStats>({
+    queryKey: queryKeys.libraries.stats(libraryName),
+    queryFn: async () => {
+      const response = await api.get<{ data: LibraryStats }>(`/api/libraries/${libraryName}/stats`);
+      return response.data;
+    },
+    enabled: !!libraryName,
+  });
+}
+
+/**
+ * Hook to import library entries
+ */
+export function useImportEntries() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({
+      libraryName,
+      data,
+      mode = 'replace',
+    }: {
+      libraryName: string;
+      data: Record<string, unknown> | unknown[];
+      mode?: 'replace' | 'merge';
+    }) =>
+      api.post(`/api/libraries/${libraryName}/import`, {
+        data,
+        mode,
+      }),
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.list(variables.libraryName) });
+      const count = (response as any).data?.count || 0;
+      toast({
+        title: '导入成功',
+        description: `成功导入 ${count} 条数据`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '导入失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}

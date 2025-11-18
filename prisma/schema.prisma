@@ -15,15 +15,31 @@ datasource db {
 // 库配置表
 // ========================================
 model Library {
-  id          String   @id @default(cuid())
-  name        String   @unique  // character, pose, scene, theme, style, decorative_props
-  displayName String            // 人物, 姿态, 场景, 主题, 画风, 装饰小物
-  entries     Json              // 库条目JSON数组
-  schema      Json?             // JSON Schema定义（用于验证）
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String   @unique  // character, pose, scene, theme, style, decorative_props
+  displayName   String            // 人物, 姿态, 场景, 主题, 画风, 装饰小物
+  description   String?           // 库描述说明
+  displayField  String   @default("name") // 在UI中显示的主要字段名
+
+  // 库配置
+  entries       Json              // 库条目JSON数组
+  schema        Json?             // JSON Schema定义（用于验证）
+  schemaVersion String   @default("1.0") // Schema版本号
+
+  // 显示和组织
+  order         Int      @default(0)     // 显示排序（数字越小越靠前）
+  category      String?                  // 库分类（可选）
+  isActive      Boolean  @default(true)  // 是否启用
+
+  // 元数据
+  metadata      Json?                    // 其他元数据信息
+
+  // 时间戳
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([name])
+  @@index([isActive, order])
 }
 
 // ========================================

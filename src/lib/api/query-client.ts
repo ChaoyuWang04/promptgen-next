@@ -45,11 +45,13 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   // Library keys
   libraries: {
-    all: ['libraries'] as const,
-    config: () => [...queryKeys.libraries.all, 'config'] as const,
-    list: (name: string) => [...queryKeys.libraries.all, name] as const,
-    detail: (name: string, id: string) => [...queryKeys.libraries.all, name, id] as const,
-    template: (name: string) => [...queryKeys.libraries.all, name, 'template'] as const,
+    all: () => ['libraries'] as const,
+    config: () => [...queryKeys.libraries.all(), 'config'] as const,
+    templates: () => [...queryKeys.libraries.all(), 'templates'] as const,
+    list: (name: string) => [...queryKeys.libraries.all(), name] as const,
+    detail: (name: string, id: string) => [...queryKeys.libraries.all(), name, id] as const,
+    template: (name: string) => [...queryKeys.libraries.all(), name, 'template'] as const,
+    stats: (name: string) => [...queryKeys.libraries.all(), name, 'stats'] as const,
   },
 
   // Record keys
@@ -120,7 +122,7 @@ export const queryKeys = {
  * Helper to invalidate related queries after mutations
  */
 export const invalidateQueries = {
-  libraries: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries.all }),
+  libraries: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries.all() }),
   records: () => queryClient.invalidateQueries({ queryKey: queryKeys.records.all }),
   prompts: () => queryClient.invalidateQueries({ queryKey: queryKeys.prompts.all }),
   templates: () => queryClient.invalidateQueries({ queryKey: queryKeys.templates.all }),

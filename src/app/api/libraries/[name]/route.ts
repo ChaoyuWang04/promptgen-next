@@ -4,6 +4,7 @@
  * GET    /api/libraries/[name]       - Get all entries from a library
  * POST   /api/libraries/[name]       - Create a new entry in a library
  * PUT    /api/libraries/[name]       - Update entire library entries
+ * PATCH  /api/libraries/[name]       - Update library metadata (name, description, schema, etc.)
  * DELETE /api/libraries/[name]       - Delete entire library
  *
  * Replaces Flask endpoints:
@@ -431,6 +432,123 @@ export async function PUT(
         error: {
           code: 'INTERNAL_ERROR',
           message: '更新库失败',
+          details: { originalError: error instanceof Error ? error.message : 'Unknown error' },
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/libraries/[name]
+ *
+ * Updates library metadata (displayName, description, schema, etc.).
+ * Does NOT update entries - use PUT for that.
+ *
+ * Request body (all fields optional):
+ * {
+ *   "displayName": string,
+ *   "description": string,
+ *   "displayField": string,
+ *   "category": string,
+ *   "order": number,
+ *   "schema": object,
+ *   "isActive": boolean
+ * }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ name: string }> }
+) {
+  try {
+    const { name } = await params;
+
+    // Check if library exists
+    const library = await prisma.library.findUnique({
+      where: { name },
+    });
+
+    if (!library) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `库不存在: ${name}`,
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    // Parse request body
+    const body = await request.json();
+
+    // Build update data object (only include provided fields)
+    const updateData: any = {};
+
+    if (body.displayName !== undefined) {
+      updateData.displayName = body.displayName;
+    }
+    if (body.description !== undefined) {
+      updateData.description = body.description;
+    }
+    if (body.displayField !== undefined) {
+      updateData.displayField = body.displayField;
+    }
+    if (body.category !== undefined) {
+      updateData.category = body.category;
+    }
+    if (body.order !== undefined) {
+      updateData.order = body.order;
+    }
+    if (body.schema !== undefined) {
+      updateData.schema = body.schema;
+    }
+    if (body.isActive !== undefined) {
+      updateData.isActive = body.isActive;
+    }
+    if (body.schemaVersion !== undefined) {
+      updateData.schemaVersion = body.schemaVersion;
+    }
+    if (body.metadata !== undefined) {
+      updateData.metadata = body.metadata;
+    }
+
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: '没有提供要更新的字段',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // Update library
+    const updated = await prisma.library.update({
+      where: { name },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+    });
+  } catch (error) {
+    console.error(`[PATCH /api/libraries/${(await params).name}] Error:`, error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '更新库元数据失败',
           details: { originalError: error instanceof Error ? error.message : 'Unknown error' },
         },
       },
