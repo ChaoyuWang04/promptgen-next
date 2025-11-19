@@ -93,6 +93,7 @@ export async function GET(
       createdAt: library.createdAt.toISOString(),
       updatedAt: library.updatedAt.toISOString(),
       metadata: library.metadata,
+      schema: library.schema, // Add schema for editing
     };
 
     return NextResponse.json({

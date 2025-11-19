@@ -57,6 +57,7 @@ import {
   Eye,
   AlertCircle,
 } from 'lucide-react';
+import { SchemaEditor } from './schema-editor';
 
 // Form validation schema for basic info tab
 const basicInfoSchema = z.object({
@@ -86,6 +87,8 @@ export function LibraryConfigDialog({
   const [schemaViewMode, setSchemaViewMode] = useState<'preview' | 'json'>('preview');
   const [importData, setImportData] = useState('');
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('merge');
+  const [editedSchema, setEditedSchema] = useState<Record<string, unknown> | null>(null);
+  const [isSchemaEdited, setIsSchemaEdited] = useState(false);
 
   const { data: stats, isLoading: isLoadingStats } = useLibraryStats(libraryName);
   const updateLibrary = useUpdateLibrary();
@@ -112,6 +115,11 @@ export function LibraryConfigDialog({
         order: stats.order,
         isActive: stats.isActive,
       });
+      // Initialize schema from schema field
+      if (stats.schema) {
+        setEditedSchema(stats.schema as Record<string, unknown>);
+        setIsSchemaEdited(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats]); // Only reset when stats change, not when form state changes
@@ -131,6 +139,28 @@ export function LibraryConfigDialog({
       onSuccess?.();
     } catch (error) {
       console.error('Update library error:', error);
+    }
+  };
+
+  const handleSchemaChange = (schema: Record<string, unknown>) => {
+    setEditedSchema(schema);
+    setIsSchemaEdited(true);
+  };
+
+  const handleSchemaSave = async () => {
+    if (!editedSchema) return;
+
+    try {
+      await updateLibrary.mutateAsync({
+        name: libraryName,
+        data: {
+          schema: editedSchema,
+        },
+      });
+      setIsSchemaEdited(false);
+      onSuccess?.();
+    } catch (error) {
+      console.error('Update schema error:', error);
     }
   };
 
@@ -324,65 +354,38 @@ export function LibraryConfigDialog({
                   {stats?.structureType === 'nested_array' ? '嵌套数组' : '标准对象'}
                 </Badge>
                 <Badge variant="secondary">Schema Version: {stats?.schemaVersion}</Badge>
+                {isSchemaEdited && (
+                  <Badge variant="destructive">未保存</Badge>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setSchemaViewMode(schemaViewMode === 'preview' ? 'json' : 'preview')
-                  }
-                >
-                  {schemaViewMode === 'preview' ? (
-                    <>
-                      <Code className="mr-2 h-4 w-4" />
-                      JSON 编辑器
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="mr-2 h-4 w-4" />
-                      预览
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                onClick={handleSchemaSave}
+                disabled={!isSchemaEdited || updateLibrary.isPending}
+              >
+                {updateLibrary.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                <Save className="mr-2 h-4 w-4" />
+                保存 Schema
+              </Button>
             </div>
 
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                Schema 编辑器功能即将推出。当前版本仅支持查看字段结构。
-              </AlertDescription>
-            </Alert>
-
-            {schemaViewMode === 'preview' ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">字段结构预览</CardTitle>
-                  <CardDescription>当前库的字段定义</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <pre className="text-xs bg-muted p-4 rounded-md overflow-auto max-h-96">
-                    {JSON.stringify(stats?.metadata || {}, null, 2)}
-                  </pre>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">JSON 编辑器</CardTitle>
-                  <CardDescription>编辑字段结构（即将推出）</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    className="font-mono text-xs resize-none"
-                    rows={15}
-                    disabled
-                    value={JSON.stringify(stats?.metadata || {}, null, 2)}
-                  />
-                </CardContent>
-              </Card>
+            {stats && stats.entryCount > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>警告：</strong>此库中已有 {stats.entryCount} 条数据。
+                  修改 Schema 可能导致现有数据与新结构不兼容，请谨慎操作。
+                </AlertDescription>
+              </Alert>
             )}
+
+            <SchemaEditor
+              value={editedSchema || undefined}
+              onChange={handleSchemaChange}
+              height="500px"
+            />
           </TabsContent>
 
           {/* Tab 3: Data Management */}

@@ -16,6 +16,7 @@ export interface LibraryConfig {
   type: 'required' | 'optional';
   order: number;
   structureType: 'standard' | 'nested_array';
+  description?: string;
 }
 
 export interface LibraryEntry {
@@ -308,6 +309,7 @@ export interface LibraryStats {
   createdAt: string;
   updatedAt: string;
   metadata?: Record<string, unknown>;
+  schema?: Record<string, unknown>; // JSON Schema for library entries
 }
 
 /**
@@ -317,8 +319,8 @@ export function useLibraryTemplates() {
   return useQuery<LibraryTemplate[]>({
     queryKey: queryKeys.libraries.templates(),
     queryFn: async () => {
-      const response = await api.get<{ data: LibraryTemplate[] }>('/api/libraries/templates');
-      return response.data;
+      const templates = await api.get<LibraryTemplate[]>('/api/libraries/templates');
+      return templates;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes (templates rarely change)
   });
@@ -434,8 +436,8 @@ export function useLibraryStats(libraryName: string) {
   return useQuery<LibraryStats>({
     queryKey: queryKeys.libraries.stats(libraryName),
     queryFn: async () => {
-      const response = await api.get<{ data: LibraryStats }>(`/api/libraries/${libraryName}/stats`);
-      return response.data;
+      const stats = await api.get<LibraryStats>(`/api/libraries/${libraryName}/stats`);
+      return stats;
     },
     enabled: !!libraryName,
   });

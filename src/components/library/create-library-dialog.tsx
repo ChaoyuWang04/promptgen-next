@@ -3,9 +3,10 @@
 /**
  * Create Library Dialog Component
  *
- * 创建新库对话框（两步骤）：
+ * 创建新库对话框（三步骤）：
  * Step 1: 选择模板或空白库
  * Step 2: 填写基本信息
+ * Step 3: 定义 Schema（仅空白库）
  */
 
 import { useState } from 'react';
@@ -36,6 +37,7 @@ import { useLibraryTemplates, useCreateLibrary, type LibraryTemplate } from '@/h
 import { Loader2, FileText, Sparkles, ChevronLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { SchemaEditor } from './schema-editor';
 
 // Form validation schema
 const createLibrarySchema = z.object({
@@ -46,7 +48,7 @@ const createLibrarySchema = z.object({
     .max(50, '库名称最多 50 个字符'),
   displayName: z.string().min(1, '显示名称不能为空').max(100, '显示名称最多 100 个字符'),
   description: z.string().max(500, '描述最多 500 个字符').optional(),
-  displayField: z.string().default('name'),
+  displayField: z.string().min(1).optional(),
 });
 
 type CreateLibraryFormData = z.infer<typeof createLibrarySchema>;
@@ -62,8 +64,9 @@ export function CreateLibraryDialog({
   onOpenChange,
   onSuccess,
 }: CreateLibraryDialogProps) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedTemplate, setSelectedTemplate] = useState<LibraryTemplate | null>(null);
+  const [customSchema, setCustomSchema] = useState<Record<string, unknown> | null>(null);
 
   const { data: templates, isLoading: isLoadingTemplates } = useLibraryTemplates();
   const createLibrary = useCreateLibrary();
@@ -73,7 +76,6 @@ export function CreateLibraryDialog({
     defaultValues: {
       name: '',
       displayName: '',
-      description: '',
       displayField: 'name',
     },
   });
@@ -94,20 +96,29 @@ export function CreateLibraryDialog({
     setStep(1);
   };
 
+  const handleNext = () => {
+    // For blank library, go to schema definition step
+    if (!selectedTemplate) {
+      setStep(3);
+    }
+  };
+
   const handleSubmit = async (data: CreateLibraryFormData) => {
     try {
       await createLibrary.mutateAsync({
         name: data.name,
         displayName: data.displayName,
         description: data.description,
-        displayField: data.displayField,
+        displayField: data.displayField || 'name',
         templateName: selectedTemplate?.name,
+        schema: !selectedTemplate ? customSchema || undefined : undefined,
       });
 
       // Reset and close
       form.reset();
       setStep(1);
       setSelectedTemplate(null);
+      setCustomSchema(null);
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -120,6 +131,7 @@ export function CreateLibraryDialog({
     form.reset();
     setStep(1);
     setSelectedTemplate(null);
+    setCustomSchema(null);
     onOpenChange(false);
   };
 
@@ -128,12 +140,14 @@ export function CreateLibraryDialog({
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {step === 1 ? '创建新库 - 选择模板' : '创建新库 - 填写信息'}
+            {step === 1 && '创建新库 - 选择模板'}
+            {step === 2 && '创建新库 - 填写信息'}
+            {step === 3 && '创建新库 - 定义 Schema'}
           </DialogTitle>
           <DialogDescription>
-            {step === 1
-              ? '选择一个预定义模板快速开始，或创建空白库自定义结构'
-              : '填写库的基本信息'}
+            {step === 1 && '选择一个预定义模板快速开始，或创建空白库自定义结构'}
+            {step === 2 && '填写库的基本信息'}
+            {step === 3 && '定义库的字段结构（JSON Schema 格式）'}
           </DialogDescription>
         </DialogHeader>
 
@@ -292,15 +306,48 @@ export function CreateLibraryDialog({
                   <ChevronLeft className="h-4 w-4 mr-2" />
                   返回
                 </Button>
-                <Button type="submit" disabled={createLibrary.isPending}>
-                  {createLibrary.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  创建
-                </Button>
+                {selectedTemplate ? (
+                  <Button type="submit" disabled={createLibrary.isPending}>
+                    {createLibrary.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    创建
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={handleNext}>
+                    下一步
+                  </Button>
+                )}
               </DialogFooter>
             </form>
           </Form>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4">
+            <SchemaEditor
+              value={customSchema || undefined}
+              onChange={(schema) => setCustomSchema(schema)}
+              height="450px"
+            />
+
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                返回
+              </Button>
+              <Button
+                type="button"
+                onClick={() => form.handleSubmit(handleSubmit)()}
+                disabled={createLibrary.isPending || !customSchema}
+              >
+                {createLibrary.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                创建
+              </Button>
+            </DialogFooter>
+          </div>
         )}
 
         {step === 1 && (
