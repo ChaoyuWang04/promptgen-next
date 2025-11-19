@@ -5,7 +5,7 @@
  * Refactored with sidebar layout for dynamic library management
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLibraryConfig } from '@/hooks/use-libraries';
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -48,9 +48,12 @@ export default function LibrariesPage() {
   }, [config]);
 
   // Set first library as selected when data loads
-  if (libraries.length > 0 && !selectedLibrary) {
-    setSelectedLibrary(libraries[0].name);
-  }
+  useEffect(() => {
+    if (libraries.length > 0 && !selectedLibrary) {
+      setSelectedLibrary(libraries[0].name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraries]); // Only run when libraries data changes, not when selectedLibrary changes
 
   // Get currently selected library details
   const currentLibrary = useMemo(() => {
@@ -58,32 +61,32 @@ export default function LibrariesPage() {
     return config.enabled_libraries.find((lib) => lib.name === selectedLibrary);
   }, [selectedLibrary, config]);
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = useCallback(() => {
     refetch();
-  };
+  }, [refetch]);
 
-  const handleConfigClick = () => {
+  const handleConfigClick = useCallback(() => {
     setConfigDialogOpen(true);
-  };
+  }, []);
 
-  const handleAddEntryClick = () => {
+  const handleAddEntryClick = useCallback(() => {
     setEditingEntryId(null); // null = create mode
     setEntryDialogOpen(true);
-  };
+  }, []);
 
-  const handleEntrySuccess = () => {
+  const handleEntrySuccess = useCallback(() => {
     refetch();
-  };
+  }, [refetch]);
 
-  const handleViewEntry = (entryId: string) => {
+  const handleViewEntry = useCallback((entryId: string) => {
     setViewingEntryId(entryId);
     setDetailDialogOpen(true);
-  };
+  }, []);
 
-  const handleEditEntry = (entryId: string) => {
+  const handleEditEntry = useCallback((entryId: string) => {
     setEditingEntryId(entryId);
     setEntryDialogOpen(true);
-  };
+  }, []);
 
   if (isLoading) {
     return (

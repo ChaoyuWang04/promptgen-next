@@ -10,7 +10,7 @@
  * - Tab 4: Statistics
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -94,24 +94,27 @@ export function LibraryConfigDialog({
   const form = useForm<BasicInfoFormData>({
     resolver: zodResolver(basicInfoSchema),
     defaultValues: {
-      displayName: stats?.displayName || '',
-      description: stats?.description || '',
-      displayField: stats?.displayField || 'name',
-      order: stats?.order || 0,
-      isActive: stats?.isActive ?? true,
+      displayName: '',
+      description: '',
+      displayField: 'name',
+      order: 0,
+      isActive: true,
     },
   });
 
-  // Update form when stats load
-  if (stats && !form.formState.isDirty) {
-    form.reset({
-      displayName: stats.displayName,
-      description: stats.description || '',
-      displayField: stats.displayField,
-      order: stats.order,
-      isActive: stats.isActive,
-    });
-  }
+  // Update form when stats load (moved to useEffect to avoid render-phase state updates)
+  useEffect(() => {
+    if (stats && !form.formState.isDirty) {
+      form.reset({
+        displayName: stats.displayName,
+        description: stats.description || '',
+        displayField: stats.displayField,
+        order: stats.order,
+        isActive: stats.isActive,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats]); // Only reset when stats change, not when form state changes
 
   const handleBasicInfoSubmit = async (data: BasicInfoFormData) => {
     try {
