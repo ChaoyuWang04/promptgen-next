@@ -16,23 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import {
-  isValidLibraryName,
-  getLibraryConfig,
-  getLibraryDisplayName,
-  type LibraryName,
-} from '@/lib/config/library-config';
 
 export const dynamic = 'force-dynamic';
-
-/**
- * Type guard for library name validation
- */
-function validateLibraryName(name: string): asserts name is LibraryName {
-  if (!isValidLibraryName(name)) {
-    throw new Error(`未知的库名称: ${name}`);
-  }
-}
 
 /**
  * GET /api/libraries/[name]
@@ -53,24 +38,6 @@ export async function GET(
   try {
     const { name } = await params;
 
-    // Validate library name
-    validateLibraryName(name);
-
-    // Get library configuration
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: `库配置不存在: ${name}`,
-          },
-        },
-        { status: 404 }
-      );
-    }
-
     // Query library from database
     const library = await prisma.library.findUnique({
       where: { name },
@@ -90,7 +57,7 @@ export async function GET(
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: `库不存在: ${getLibraryDisplayName(name)}`,
+            message: `库不存在: ${name}`,
           },
         },
         { status: 404 }
@@ -104,19 +71,6 @@ export async function GET(
     });
   } catch (error) {
     console.error(`[GET /api/libraries/${(await params).name}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: error.message,
-          },
-        },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {
@@ -154,21 +108,6 @@ export async function POST(
 ) {
   try {
     const { name } = await params;
-    validateLibraryName(name);
-
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: `库配置不存在: ${name}`,
-          },
-        },
-        { status: 404 }
-      );
-    }
 
     // Parse request body
     const body = await request.json();
@@ -200,7 +139,7 @@ export async function POST(
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: `库不存在: ${getLibraryDisplayName(name)}`,
+            message: `库不存在: ${name}`,
           },
         },
         { status: 404 }
@@ -210,7 +149,10 @@ export async function POST(
     const currentEntries = library.entries as Record<string, any>;
     let newEntries: Record<string, any>;
 
-    if (config.structureType === 'nested_array') {
+    // Determine structure type from entries (nested_array has common_props array)
+    const isNestedArray = currentEntries.common_props && Array.isArray(currentEntries.common_props);
+
+    if (isNestedArray) {
       // Nested array structure (decorative_props)
       const commonProps = currentEntries.common_props || [];
 
@@ -295,25 +237,14 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      library_name: updated.name,
-      entry_id: config.structureType === 'nested_array' ? entry_data.id : entry_id,
-      updated_at: updated.updatedAt,
+      data: {
+        library_name: updated.name,
+        entry_id: isNestedArray ? entry_data.id : entry_id,
+        updated_at: updated.updatedAt,
+      },
     });
   } catch (error) {
     console.error(`[POST /api/libraries/${(await params).name}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: error.message,
-          },
-        },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {
@@ -345,21 +276,6 @@ export async function PUT(
 ) {
   try {
     const { name } = await params;
-    validateLibraryName(name);
-
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: `库配置不存在: ${name}`,
-          },
-        },
-        { status: 404 }
-      );
-    }
 
     // Parse request body
     const body = await request.json();
@@ -378,15 +294,37 @@ export async function PUT(
       );
     }
 
-    // Validate structure for nested_array
-    if (config.structureType === 'nested_array') {
+    // Check if library exists
+    const existingLibrary = await prisma.library.findUnique({
+      where: { name },
+      select: { id: true, entries: true },
+    });
+
+    if (!existingLibrary) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `库不存在: ${name}`,
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    // Validate structure for nested_array (check if existing library uses nested_array structure)
+    const existingEntries = existingLibrary.entries as Record<string, any>;
+    const isNestedArray = existingEntries.common_props && Array.isArray(existingEntries.common_props);
+
+    if (isNestedArray) {
       if (!Array.isArray(entries.common_props)) {
         return NextResponse.json(
           {
             success: false,
             error: {
               code: 'VALIDATION_ERROR',
-              message: 'decorative_props 必须包含 common_props 数组',
+              message: '此库使用嵌套数组结构，必须包含 common_props 数组',
             },
           },
           { status: 400 }
@@ -412,19 +350,6 @@ export async function PUT(
     });
   } catch (error) {
     console.error(`[PUT /api/libraries/${(await params).name}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: error.message,
-          },
-        },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {
@@ -558,9 +483,40 @@ export async function PATCH(
 }
 
 /**
+ * Helper function to renumber all libraries sequentially
+ * Called after a library is deleted to maintain sequential order (0, 1, 2, 3...)
+ */
+async function renumberLibraries() {
+  // Fetch all libraries ordered by their current order value
+  const libraries = await prisma.library.findMany({
+    select: { id: true, name: true, order: true },
+    orderBy: { order: 'asc' },
+  });
+
+  // Renumber sequentially using a transaction
+  await prisma.$transaction(async (tx) => {
+    // First set all to negative values to avoid unique constraint conflicts
+    for (let i = 0; i < libraries.length; i++) {
+      await tx.library.update({
+        where: { id: libraries[i].id },
+        data: { order: -(i + 1) },
+      });
+    }
+
+    // Then set the final order values
+    for (let i = 0; i < libraries.length; i++) {
+      await tx.library.update({
+        where: { id: libraries[i].id },
+        data: { order: i },
+      });
+    }
+  });
+}
+
+/**
  * DELETE /api/libraries/[name]
  *
- * Deletes an entire library (use with caution!).
+ * Deletes an entire library and automatically renumbers remaining libraries.
  */
 export async function DELETE(
   request: NextRequest,
@@ -568,17 +524,24 @@ export async function DELETE(
 ) {
   try {
     const { name } = await params;
-    validateLibraryName(name);
 
-    // Delete library
-    const deleted = await prisma.library.delete({
-      where: { name },
-      select: {
-        id: true,
-        name: true,
-        displayName: true,
-      },
+    // Delete library and renumber in a transaction
+    const deleted = await prisma.$transaction(async (tx) => {
+      // First, delete the library
+      const deletedLib = await tx.library.delete({
+        where: { name },
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+        },
+      });
+
+      return deletedLib;
     });
+
+    // After successful deletion, renumber all remaining libraries
+    await renumberLibraries();
 
     return NextResponse.json({
       success: true,
@@ -588,19 +551,6 @@ export async function DELETE(
     });
   } catch (error) {
     console.error(`[DELETE /api/libraries/${(await params).name}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: error.message,
-          },
-        },
-        { status: 400 }
-      );
-    }
 
     // Handle not found
     if (error instanceof Error && error.message.includes('Record to delete does not exist')) {

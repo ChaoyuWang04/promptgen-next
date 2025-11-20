@@ -12,6 +12,31 @@ datasource db {
 }
 
 // ========================================
+// 组合管理表
+// ========================================
+model Combination {
+  id              String   @id @default(cuid())
+  combinationKey  String   @unique  // betty_christmas_entrance (元素组合的唯一键)
+
+  // 库选择（动态JSON结构，支持3-N个库）
+  libraryIds      Json     // {"character": "char_betty_v1", "theme": "theme_christmas_v1", ...}
+
+  // 模板和策略配置
+  templateId      String?  // 关联的模板ID
+  strategyConfig  Json?    // 策略配置: {"fixed": ["character"], "variable": ["theme", "scene"]}
+
+  // 关联关系
+  records         Record[] // 一个组合有多个变体记录
+
+  // 时间戳
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([combinationKey])
+  @@index([templateId])
+}
+
+// ========================================
 // 库配置表
 // ========================================
 model Library {
@@ -27,9 +52,9 @@ model Library {
   schemaVersion String   @default("1.0") // Schema版本号
 
   // 显示和组织
-  order         Int      @default(0)     // 显示排序（数字越小越靠前）
-  category      String?                  // 库分类（可选）
-  isActive      Boolean  @default(true)  // 是否启用
+  order         Int      @unique @default(0)     // 显示排序（数字越小越靠前，全局唯一）
+  category      String?                           // 库分类（可选）
+  isActive      Boolean  @default(true)           // 是否启用
 
   // 元数据
   metadata      Json?                    // 其他元数据信息
@@ -48,6 +73,11 @@ model Library {
 model Record {
   id                String   @id @default(cuid())
   imageId           String   @unique  // betty_turnback_living_halloween_retro50s_0001
+
+  // 组合关联
+  combinationId     String?
+  combination       Combination? @relation(fields: [combinationId], references: [id], onDelete: SetNull)
+  variantNumber     Int      @default(1)  // v1, v2, v3... (同一组合下的变体编号)
 
   // 库选择（动态JSON结构，支持3-N个库）
   libraryIds        Json     // {"character": "char_betty_v1", "pose": "...", ...}
@@ -73,6 +103,7 @@ model Record {
   updatedAt         DateTime @updatedAt
 
   @@index([imageId])
+  @@index([combinationId])
   @@index([promptGenerated, imageGenerated])
 }
 

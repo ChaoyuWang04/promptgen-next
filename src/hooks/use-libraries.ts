@@ -502,3 +502,78 @@ export function useImportEntries() {
     },
   });
 }
+
+/**
+ * Hook to bulk delete library entries
+ */
+export function useBulkDeleteLibraryEntries() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({
+      libraryName,
+      entryIds,
+    }: {
+      libraryName: string;
+      entryIds: string[];
+    }) =>
+      api.post(`/api/libraries/${libraryName}/bulk-delete`, {
+        entryIds,
+      }),
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.libraries.list(variables.libraryName),
+      });
+      const deletedCount = (response as any).data?.deletedCount || 0;
+      toast({
+        title: '批量删除成功',
+        description: `已成功删除 ${deletedCount} 个条目`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '批量删除失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to reorder libraries by swapping their order values
+ */
+export function useReorderLibraries() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({
+      library1,
+      library2,
+    }: {
+      library1: string;
+      library2: string;
+    }) =>
+      api.post('/api/libraries/reorder', {
+        library1,
+        library2,
+      }),
+    onSuccess: () => {
+      // Invalidate all library-related queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.all() });
+      toast({
+        title: '排序已更新',
+        description: '库顺序已成功调整',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '排序失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}

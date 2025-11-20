@@ -85,7 +85,6 @@ const basicInfoSchema = z.object({
   displayName: z.string().min(1, '显示名称不能为空').max(100, '显示名称最多 100 个字符'),
   description: z.string().max(500, '描述最多 500 个字符').optional(),
   displayField: z.string().min(1, '显示字段不能为空'),
-  order: z.number().int().min(0, '排序值不能为负'),
   isActive: z.boolean(),
 });
 
@@ -124,7 +123,6 @@ export function LibraryConfigDialog({
       displayName: '',
       description: '',
       displayField: 'name',
-      order: 0,
       isActive: true,
     },
   });
@@ -136,7 +134,6 @@ export function LibraryConfigDialog({
         displayName: stats.displayName,
         description: stats.description || '',
         displayField: stats.displayField,
-        order: stats.order,
         isActive: stats.isActive,
       });
       // Initialize schema from schema field
@@ -156,7 +153,6 @@ export function LibraryConfigDialog({
           displayName: data.displayName,
           description: data.description,
           displayField: data.displayField,
-          order: data.order,
           isActive: data.isActive,
         },
       });
@@ -319,27 +315,6 @@ export function LibraryConfigDialog({
                       </FormControl>
                       <FormDescription>
                         在列表中显示的主要字段名（默认: name）
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="order"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>排序值</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        控制库在侧边栏中的显示顺序（数字越小越靠前）
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
