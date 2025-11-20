@@ -10,10 +10,11 @@
  * - Tab 4: Statistics
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import dynamic from 'next/dynamic';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +53,7 @@ import {
   useLibraryStats,
   useUpdateLibrary,
   useImportEntries,
+  useDeleteLibrary,
   type LibraryStats,
 } from '@/hooks/use-libraries';
 import {
@@ -56,8 +68,17 @@ import {
   Settings,
   Eye,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { SchemaEditor } from './schema-editor';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { editor } from 'monaco-editor';
+
+// Dynamic import of Monaco Editor to avoid SSR issues
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[400px] w-full" />,
+});
 
 // Form validation schema for basic info tab
 const basicInfoSchema = z.object({
@@ -89,10 +110,13 @@ export function LibraryConfigDialog({
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('merge');
   const [editedSchema, setEditedSchema] = useState<Record<string, unknown> | null>(null);
   const [isSchemaEdited, setIsSchemaEdited] = useState(false);
+  const [deleteLibraryDialogOpen, setDeleteLibraryDialogOpen] = useState(false);
+  const importEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const { data: stats, isLoading: isLoadingStats } = useLibraryStats(libraryName);
   const updateLibrary = useUpdateLibrary();
   const importEntries = useImportEntries();
+  const deleteLibrary = useDeleteLibrary();
 
   const form = useForm<BasicInfoFormData>({
     resolver: zodResolver(basicInfoSchema),
@@ -202,7 +226,21 @@ export function LibraryConfigDialog({
     }
   };
 
+  // 处理删除库
+  const handleDeleteLibrary = async () => {
+    try {
+      await deleteLibrary.mutateAsync(libraryName);
+      setDeleteLibraryDialogOpen(false);
+      onOpenChange(false); // 关闭配置对话框
+      onSuccess?.(); // 刷新父组件（库列表）
+    } catch (error) {
+      console.error('Delete library error:', error);
+      // 错误处理已在hook中通过toast显示
+    }
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
@@ -326,21 +364,35 @@ export function LibraryConfigDialog({
                   )}
                 />
 
-                <div className="flex justify-end gap-2 pt-4 border-t">
+                <div className="flex justify-between items-center gap-2 pt-4 border-t">
+                  {/* 左侧：删除按钮 */}
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => onOpenChange(false)}
+                    onClick={() => setDeleteLibraryDialogOpen(true)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
-                    取消
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    删除库
                   </Button>
-                  <Button type="submit" disabled={updateLibrary.isPending}>
-                    {updateLibrary.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    <Save className="mr-2 h-4 w-4" />
-                    保存
-                  </Button>
+
+                  {/* 右侧：取消 + 保存按钮 */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      取消
+                    </Button>
+                    <Button type="submit" disabled={updateLibrary.isPending}>
+                      {updateLibrary.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      <Save className="mr-2 h-4 w-4" />
+                      保存
+                    </Button>
+                  </div>
                 </div>
               </form>
             </Form>
@@ -440,24 +492,62 @@ export function LibraryConfigDialog({
                       <span className="text-sm">替换</span>
                     </label>
                   </div>
-                  <Textarea
-                    placeholder="粘贴 JSON 数据..."
-                    className="font-mono text-xs resize-none"
-                    rows={10}
-                    value={importData}
-                    onChange={(e) => setImportData(e.target.value)}
-                  />
-                  <Button
-                    onClick={handleImport}
-                    className="w-full"
-                    disabled={!importData.trim() || importEntries.isPending}
-                  >
-                    {importEntries.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    <Upload className="mr-2 h-4 w-4" />
-                    导入
-                  </Button>
+                  <div className="border rounded-md overflow-hidden">
+                    <Editor
+                      height="400px"
+                      defaultLanguage="json"
+                      value={importData}
+                      onChange={(value) => setImportData(value || '')}
+                      onMount={(editor) => {
+                        importEditorRef.current = editor;
+                      }}
+                      theme="vs-dark"
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        lineNumbers: 'on',
+                        formatOnPaste: true,
+                        formatOnType: true,
+                        scrollBeyondLastLine: false,
+                        automaticLayout: true,
+                        tabSize: 2,
+                        wordWrap: 'on',
+                        quickSuggestions: false,
+                        bracketPairColorization: {
+                          enabled: true,
+                        },
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleImport}
+                      className="flex-1"
+                      disabled={!importData.trim() || importEntries.isPending}
+                    >
+                      {importEntries.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      <Upload className="mr-2 h-4 w-4" />
+                      导入
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Format JSON
+                        try {
+                          const parsed = JSON.parse(importData);
+                          setImportData(JSON.stringify(parsed, null, 2));
+                        } catch {
+                          // If invalid JSON, just trigger Monaco formatter
+                          importEditorRef.current?.getAction('editor.action.formatDocument')?.run();
+                        }
+                      }}
+                      disabled={!importData.trim()}
+                    >
+                      格式化
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -554,5 +644,50 @@ export function LibraryConfigDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+
+    {/* 删除库确认对话框 */}
+    <AlertDialog open={deleteLibraryDialogOpen} onOpenChange={setDeleteLibraryDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>确认删除库</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2">
+            <span className="block">
+              确定要删除库 <strong className="text-foreground">{stats?.displayName || libraryName}</strong> 吗？
+            </span>
+            <span className="block text-destructive font-semibold">
+              ⚠️ 警告：此操作将永久删除该库及其所有 {stats?.entryCount || 0} 条数据，且无法恢复！
+            </span>
+            {stats && stats.entryCount > 0 && (
+              <span className="block text-sm text-muted-foreground">
+                删除后，引用此库的记录和组合可能会失效。
+              </span>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleteLibrary.isPending}>
+            取消
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteLibrary}
+            disabled={deleteLibrary.isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleteLibrary.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                删除中...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                确认删除
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
