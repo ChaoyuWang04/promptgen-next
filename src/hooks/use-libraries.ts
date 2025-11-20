@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { queryKeys, invalidateQueries } from '@/lib/api/query-client';
 import { useToast } from '@/hooks/use-toast';
+import { getTemplateByName } from '@/lib/templates/library-templates';
 
 // Types
 export interface LibraryConfig {
@@ -150,7 +151,24 @@ export function useCreateLibraryEntry() {
     }: {
       libraryName: string;
       entry: LibraryEntry;
-    }) => api.post(`/api/libraries/${libraryName}`, { entry }),
+    }) => {
+      // Determine structure type from library template
+      const template = getTemplateByName(libraryName);
+      const isNestedArray = template?.structureType === 'nested_array';
+
+      if (isNestedArray) {
+        // Nested array structure (decorative_props): only send entry_data
+        return api.post(`/api/libraries/${libraryName}`, {
+          entry_data: entry,
+        });
+      } else {
+        // Standard structure: send entry_id + entry_data
+        return api.post(`/api/libraries/${libraryName}`, {
+          entry_id: entry.id,
+          entry_data: entry,
+        });
+      }
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.libraries.list(variables.libraryName),
@@ -186,7 +204,10 @@ export function useUpdateLibraryEntry() {
       libraryName: string;
       entryId: string;
       entry: Partial<LibraryEntry>;
-    }) => api.put(`/api/libraries/${libraryName}/${entryId}`, { entry }),
+    }) =>
+      api.put(`/api/libraries/${libraryName}/${entryId}`, {
+        entry_data: entry,
+      }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.libraries.list(variables.libraryName),
