@@ -3,44 +3,43 @@
 /**
  * Entry Form Dialog Component
  *
- * Mixed-mode dialog for creating or editing library entries:
- * - Form mode: Dynamic form generated from library schema
- * - JSON mode: Direct JSON editor
- * - Toggle between modes
- * - Validation against library schema
+ * Unified JSON editor dialog for creating or editing library entries:
+ * - Real-time ID and name preview from JSON
+ * - Monaco JSON editor with schema validation
+ * - Template loading for new entries
+ * - Format and load template buttons
  */
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect, useMemo } from 'react';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { JsonEntryEditor } from '@/components/library/json-entry-editor';
+import {
+  getFormattedExampleJson,
+  getLibraryTemplate,
+  type LibraryType,
+} from '@/lib/utils/monaco-schema-provider';
 import {
   useLibraryEntry,
   useCreateLibraryEntry,
   useUpdateLibraryEntry,
+  useLibraryStats,
   type LibraryEntry,
 } from '@/hooks/use-libraries';
-import { Loader2, Save, Code, FileEdit, AlertCircle, Eye } from 'lucide-react';
+import {
+  generateFormattedTemplateFromSchema,
+  canGenerateTemplate,
+} from '@/lib/utils/schema-template-generator';
+import { Loader2, Save, Code, FileJson } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface EntryFormDialogProps {
@@ -58,9 +57,7 @@ export function EntryFormDialog({
   entryId,
   onSuccess,
 }: EntryFormDialogProps) {
-  const [viewMode, setViewMode] = useState<'form' | 'json'>('form');
   const [jsonData, setJsonData] = useState('');
-  const [jsonError, setJsonError] = useState('');
 
   const isEditMode = !!entryId;
 
@@ -70,70 +67,124 @@ export function EntryFormDialog({
     entryId || ''
   );
 
+  // Fetch library stats (includes schema and structureType)
+  const { data: libraryStats } = useLibraryStats(libraryName);
+
   const createMutation = useCreateLibraryEntry();
   const updateMutation = useUpdateLibraryEntry();
 
-  const form = useForm<Record<string, unknown>>({
-    defaultValues: {
-      id: '',
-      name: '',
-      description: '',
-    },
-  });
+  // Get library template information
+  const libraryTemplate = useMemo(
+    () => getLibraryTemplate(libraryName as LibraryType),
+    [libraryName]
+  );
+
+  // Real-time preview: parse JSON to extract ID and display name
+  const previewInfo = useMemo(() => {
+    try {
+      const parsed = JSON.parse(jsonData);
+
+      // Get display field based on library type
+      const displayField = libraryTemplate?.displayField || 'name';
+
+      return {
+        id: parsed.id || '',
+        name: parsed[displayField] || '',
+        isValid: true,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        id: '',
+        name: '',
+        isValid: false,
+        error: error instanceof Error ? error.message : 'JSON格式错误',
+      };
+    }
+  }, [jsonData, libraryTemplate]);
 
   // Load existing entry data when editing
   useEffect(() => {
     if (isEditMode && existingEntry) {
-      form.reset(existingEntry);
       setJsonData(JSON.stringify(existingEntry, null, 2));
-    } else if (!isEditMode) {
-      // Reset for create mode
-      form.reset({
-        id: '',
-        name: '',
-        description: '',
-      });
-      setJsonData(
-        JSON.stringify(
-          {
-            id: '',
-            name: '',
-            description: '',
-          },
-          null,
-          2
-        )
-      );
     }
-  }, [isEditMode, existingEntry, form]);
+  }, [isEditMode, existingEntry]);
 
-  const handleFormSubmit = async (data: Record<string, unknown>) => {
-    try {
-      if (isEditMode && entryId) {
-        await updateMutation.mutateAsync({
-          libraryName,
-          entryId,
-          entry: data,
-        });
-      } else {
-        await createMutation.mutateAsync({
-          libraryName,
-          entry: data as LibraryEntry,
-        });
+  // Load template JSON for create mode
+  useEffect(() => {
+    if (!isEditMode && open && !jsonData) {
+      try {
+        // Priority 1: Generate from database schema if available
+        if (libraryStats?.schema && canGenerateTemplate(libraryStats.schema)) {
+          const template = generateFormattedTemplateFromSchema(
+            libraryStats.schema,
+            libraryStats.structureType
+          );
+          setJsonData(template);
+          return;
+        }
+
+        // Priority 2: Fallback to static hardcoded template
+        const staticTemplate = getFormattedExampleJson(libraryName as LibraryType);
+        if (staticTemplate) {
+          setJsonData(staticTemplate);
+        }
+      } catch (error) {
+        console.error('Failed to load initial template:', error);
+        // Fallback to static template on error
+        const staticTemplate = getFormattedExampleJson(libraryName as LibraryType);
+        if (staticTemplate) {
+          setJsonData(staticTemplate);
+        }
       }
+    }
+  }, [isEditMode, open, libraryName, jsonData, libraryStats]);
 
-      handleClose();
-      onSuccess?.();
+  // Format JSON
+  const handleFormat = () => {
+    try {
+      const parsed = JSON.parse(jsonData);
+      const formatted = JSON.stringify(parsed, null, 2);
+      setJsonData(formatted);
     } catch (error) {
-      console.error('Form submit error:', error);
+      // If JSON is invalid, keep as is
+      console.warn('Cannot format invalid JSON');
     }
   };
 
-  const handleJsonSubmit = async () => {
+  // Load template JSON (direct override)
+  const handleLoadTemplate = () => {
     try {
-      // Validate JSON
+      // Priority 1: Generate from database schema if available
+      if (libraryStats?.schema && canGenerateTemplate(libraryStats.schema)) {
+        const template = generateFormattedTemplateFromSchema(
+          libraryStats.schema,
+          libraryStats.structureType
+        );
+        setJsonData(template);
+        return;
+      }
+
+      // Priority 2: Fallback to static hardcoded template
+      const staticTemplate = getFormattedExampleJson(libraryName as LibraryType);
+      if (staticTemplate) {
+        setJsonData(staticTemplate);
+      }
+    } catch (error) {
+      console.error('Failed to load template:', error);
+      // Fallback to static template on error
+      const staticTemplate = getFormattedExampleJson(libraryName as LibraryType);
+      if (staticTemplate) {
+        setJsonData(staticTemplate);
+      }
+    }
+  };
+
+  // Submit handler
+  const handleSubmit = async () => {
+    try {
+      // Validate and parse JSON
       const parsedData = JSON.parse(jsonData);
-      setJsonError('');
 
       if (isEditMode && entryId) {
         await updateMutation.mutateAsync({
@@ -151,47 +202,26 @@ export function EntryFormDialog({
       handleClose();
       onSuccess?.();
     } catch (error) {
-      if (error instanceof SyntaxError) {
-        setJsonError('JSON 格式错误: ' + error.message);
-      } else {
-        console.error('JSON submit error:', error);
-      }
-    }
-  };
-
-  const handleModeToggle = () => {
-    if (viewMode === 'form') {
-      // Switch to JSON mode: sync form data to JSON
-      const formData = form.getValues();
-      setJsonData(JSON.stringify(formData, null, 2));
-      setViewMode('json');
-    } else {
-      // Switch to form mode: sync JSON to form (if valid)
-      try {
-        const parsedData = JSON.parse(jsonData);
-        form.reset(parsedData);
-        setJsonError('');
-        setViewMode('form');
-      } catch (error) {
-        setJsonError('JSON 格式错误，无法切换到表单模式。请先修正 JSON 格式。');
-      }
+      console.error('Submit error:', error);
+      // Error will be shown in JsonEntryEditor validation
     }
   };
 
   const handleClose = () => {
-    form.reset();
     setJsonData('');
-    setJsonError('');
-    setViewMode('form');
     onOpenChange(false);
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // Loading state
   if (isEditMode && isLoadingEntry) {
     return (
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent>
+          <VisuallyHidden.Root>
+            <DialogTitle>加载中</DialogTitle>
+          </VisuallyHidden.Root>
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
@@ -202,168 +232,97 @@ export function EntryFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[80vw] h-[90vh] flex flex-col gap-3 overflow-hidden">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle>
-                {isEditMode ? '编辑条目' : '新增条目'}
-                {isEditMode && entryId && (
-                  <Badge variant="outline" className="ml-2 font-mono text-xs">
-                    {entryId}
-                  </Badge>
-                )}
-              </DialogTitle>
-              <DialogDescription>
-                {isEditMode ? '修改现有库条目' : '向库中添加新条目'}
-              </DialogDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleModeToggle}
-              disabled={isPending}
-            >
-              {viewMode === 'form' ? (
-                <>
-                  <Code className="mr-2 h-4 w-4" />
-                  JSON 编辑器
-                </>
-              ) : (
-                <>
-                  <FileEdit className="mr-2 h-4 w-4" />
-                  表单模式
-                </>
-              )}
-            </Button>
-          </div>
+          <DialogTitle>
+            {isEditMode ? '编辑条目' : '新增条目'}
+            {libraryTemplate && (
+              <span className="ml-2 text-muted-foreground font-normal text-sm">
+                {libraryTemplate.displayName}
+              </span>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto">
-          {viewMode === 'form' ? (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
-                {/* ID Field */}
-                <FormField
-                  control={form.control}
-                  name="id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ID *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="char_example_v1"
-                          {...field}
-                          disabled={isEditMode}
-                          value={field.value as string}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {isEditMode
-                          ? '条目 ID 不可修改'
-                          : '唯一标识符（小写字母、数字、下划线）'}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Name Field */}
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>名称 *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="示例条目"
-                          {...field}
-                          value={field.value as string}
-                        />
-                      </FormControl>
-                      <FormDescription>条目的显示名称</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Description Field */}
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>描述</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="条目的详细描述..."
-                          className="resize-none"
-                          rows={3}
-                          {...field}
-                          value={field.value as string}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    当前显示的是基本字段。如需编辑更多字段，请切换到 JSON 编辑器模式。
-                  </AlertDescription>
-                </Alert>
-
-                <DialogFooter className="gap-2">
-                  <Button type="button" variant="outline" onClick={handleClose}>
-                    取消
-                  </Button>
-                  <Button type="submit" disabled={isPending}>
-                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Save className="mr-2 h-4 w-4" />
-                    {isEditMode ? '保存' : '创建'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          ) : (
-            <div className="space-y-4">
-              <Textarea
-                className={cn(
-                  'font-mono text-xs resize-none',
-                  jsonError && 'border-destructive'
-                )}
-                rows={20}
-                value={jsonData}
-                onChange={(e) => {
-                  setJsonData(e.target.value);
-                  setJsonError('');
-                }}
-                placeholder="粘贴或编辑 JSON 数据..."
-              />
-
-              {jsonError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{jsonError}</AlertDescription>
-                </Alert>
+        {/* Preview Area: ID | Name */}
+        <div className="flex items-center gap-4 px-4 py-3 bg-muted/30 rounded-lg border">
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-muted-foreground">ID:</span>
+            <span
+              className={cn(
+                'ml-2 text-sm font-mono truncate inline-block max-w-[200px]',
+                previewInfo.isValid && previewInfo.id
+                  ? 'text-foreground'
+                  : 'text-muted-foreground/50'
               )}
+              title={previewInfo.id || '未设置'}
+            >
+              {previewInfo.id || '未设置'}
+            </span>
+          </div>
 
-              <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={handleClose}>
-                  取消
-                </Button>
-                <Button onClick={handleJsonSubmit} disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  <Save className="mr-2 h-4 w-4" />
-                  {isEditMode ? '保存' : '创建'}
-                </Button>
-              </DialogFooter>
-            </div>
+          <Separator orientation="vertical" className="h-6" />
+
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-muted-foreground">名称:</span>
+            <span
+              className={cn(
+                'ml-2 text-sm truncate inline-block max-w-[200px]',
+                previewInfo.isValid && previewInfo.name
+                  ? 'text-foreground'
+                  : 'text-muted-foreground/50'
+              )}
+              title={previewInfo.name || '未设置'}
+            >
+              {previewInfo.name || '未设置'}
+            </span>
+          </div>
+
+          {!previewInfo.isValid && previewInfo.error && (
+            <>
+              <Separator orientation="vertical" className="h-6" />
+              <Badge variant="destructive" className="text-xs shrink-0">
+                {previewInfo.error}
+              </Badge>
+            </>
           )}
         </div>
+
+        {/* Action Buttons Row */}
+        <div className="flex gap-2">
+          <Button onClick={handleFormat} variant="outline" size="sm" type="button">
+            <Code className="mr-2 h-4 w-4" />
+            格式化JSON
+          </Button>
+          <Button onClick={handleLoadTemplate} variant="outline" size="sm" type="button">
+            <FileJson className="mr-2 h-4 w-4" />
+            加载库标准配置JSON
+          </Button>
+        </div>
+
+        {/* JSON Editor - Takes remaining space */}
+        <div className="flex-1 min-h-0">
+          <JsonEntryEditor
+            libraryType={libraryName as LibraryType}
+            value={jsonData}
+            onChange={setJsonData}
+            height="100%"
+            showFormatButton={false}
+            showExampleButton={false}
+            compact={true}
+          />
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={handleClose} disabled={isPending}>
+            取消
+          </Button>
+          <Button onClick={handleSubmit} disabled={!previewInfo.isValid || isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Save className="mr-2 h-4 w-4" />
+            {isEditMode ? '保存' : '创建'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
