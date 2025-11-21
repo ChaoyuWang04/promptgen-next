@@ -5,6 +5,7 @@
  * Top header with breadcrumbs, search, and user actions
  */
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, Command } from 'lucide-react';
 import {
@@ -71,7 +72,9 @@ export function Header({ onCommandPaletteOpen }: HeaderProps) {
               {index > 0 && <BreadcrumbSeparator />}
               <BreadcrumbItem>
                 {crumb.href ? (
-                  <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
+                  <BreadcrumbLink asChild>
+                    <Link href={crumb.href}>{crumb.label}</Link>
+                  </BreadcrumbLink>
                 ) : (
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                 )}

@@ -100,7 +100,7 @@ export class ComboStatusChecker implements IChecker {
         if (issue.description.includes('invalid outfitMinorState')) {
           await prisma.record.update({
             where: { imageId },
-            data: { outfitMinorState: null },
+            data: { outfitMinorState: [] as any },
           });
 
           results.push({

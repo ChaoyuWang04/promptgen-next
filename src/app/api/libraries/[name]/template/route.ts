@@ -12,23 +12,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import {
-  isValidLibraryName,
-  getLibraryConfig,
-  getLibraryDisplayName,
-  type LibraryName,
-} from '@/lib/config/library-config';
 
 export const dynamic = 'force-dynamic';
-
-/**
- * Type guard for library name validation
- */
-function validateLibraryName(name: string): asserts name is LibraryName {
-  if (!isValidLibraryName(name)) {
-    throw new Error(`未知的库名称: ${name}`);
-  }
-}
 
 /**
  * Infer the type of a value
@@ -132,33 +117,28 @@ export async function GET(
 ) {
   try {
     const { name } = await params;
-    validateLibraryName(name);
-
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        { error: `库配置不存在: ${name}` },
-        { status: 404 }
-      );
-    }
 
     // Get library
     const library = await prisma.library.findUnique({
       where: { name },
-      select: { entries: true },
+      select: { entries: true, displayName: true },
     });
 
     if (!library) {
       return NextResponse.json(
-        { error: `库不存在: ${getLibraryDisplayName(name)}` },
+        { error: `库不存在: ${name}` },
         { status: 404 }
       );
     }
 
     const entries = library.entries as Record<string, any>;
 
+    // Determine structure type from entries
+    const isNestedArray = entries.common_props && Array.isArray(entries.common_props);
+    const structureType = isNestedArray ? 'nested_array' : 'standard';
+
     // Generate template
-    const template = generateEntryTemplate(entries, config.structureType);
+    const template = generateEntryTemplate(entries, structureType);
 
     // Infer field types
     const fieldTypes: Record<string, string> = {};
@@ -169,19 +149,12 @@ export async function GET(
     return NextResponse.json({
       template,
       field_types: fieldTypes,
-      structure_type: config.structureType,
+      structure_type: structureType,
       library_name: name,
-      display_name: config.displayName,
+      display_name: library.displayName,
     });
   } catch (error) {
     console.error(`[GET /api/libraries/${(await params).name}/template] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {

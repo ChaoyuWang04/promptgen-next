@@ -161,23 +161,23 @@ export function EntryDetailDialog({
                       </div>
                     </div>
 
-                    {entry.name && (
+                    {('name' in entry && entry.name) ? (
                       <div className="grid grid-cols-3 gap-2 items-start">
                         <span className="text-sm font-medium text-muted-foreground">
                           名称:
                         </span>
                         <div className="col-span-2">{renderValue(entry.name)}</div>
                       </div>
-                    )}
+                    ) : null}
 
-                    {entry.description && (
+                    {('description' in entry && entry.description) ? (
                       <div className="grid grid-cols-3 gap-2 items-start">
                         <span className="text-sm font-medium text-muted-foreground">
                           描述:
                         </span>
                         <div className="col-span-2">{renderValue(entry.description)}</div>
                       </div>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
 

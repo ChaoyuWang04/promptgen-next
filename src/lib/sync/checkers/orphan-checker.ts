@@ -23,22 +23,22 @@ export class OrphanChecker implements IChecker {
     const issues: SyncIssue[] = [];
 
     try {
-      // Get all valid imageIds
-      const records = await prisma.record.findMany({ select: { imageId: true } });
-      const validImageIds = new Set(records.map((r) => r.imageId));
+      // Get all valid record IDs
+      const records = await prisma.record.findMany({ select: { id: true, imageId: true } });
+      const validRecordIds = new Set(records.map((r) => r.id));
 
       // Check orphaned prompts
       const prompts = await prisma.prompt.findMany();
       for (const prompt of prompts) {
-        if (!validImageIds.has(prompt.imageId)) {
+        if (!validRecordIds.has(prompt.recordId)) {
           issues.push({
             id: uuidv4(),
             type: IssueType.ORPHAN_RECORDS,
             severity: IssueSeverity.WARNING,
-            description: `Prompt ${prompt.id} references non-existent record ${prompt.imageId}`,
-            recordId: prompt.imageId,
+            description: `Prompt ${prompt.id} references non-existent record ${prompt.recordId}`,
+            recordId: prompt.recordId,
             entityType: 'Prompt',
-            details: { promptId: prompt.id, imageId: prompt.imageId, type: prompt.type },
+            details: { promptId: prompt.id, recordId: prompt.recordId, type: prompt.type },
             canAutoRepair: true,
             repairAction: 'Delete orphaned prompt',
           });
@@ -48,17 +48,17 @@ export class OrphanChecker implements IChecker {
       // Check orphaned image variants
       const imageVariants = await prisma.imageVariant.findMany();
       for (const variant of imageVariants) {
-        if (!validImageIds.has(variant.imageId)) {
+        if (!validRecordIds.has(variant.recordId)) {
           issues.push({
             id: uuidv4(),
             type: IssueType.ORPHAN_RECORDS,
             severity: IssueSeverity.WARNING,
-            description: `ImageVariant ${variant.id} references non-existent record ${variant.imageId}`,
-            recordId: variant.imageId,
+            description: `ImageVariant ${variant.id} references non-existent record ${variant.recordId}`,
+            recordId: variant.recordId,
             entityType: 'ImageVariant',
             details: {
               variantId: variant.id,
-              imageId: variant.imageId,
+              recordId: variant.recordId,
               version: variant.version,
             },
             canAutoRepair: true,

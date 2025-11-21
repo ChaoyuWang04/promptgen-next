@@ -126,7 +126,7 @@ export function QueueStatus() {
               <span className="text-2xl font-bold text-blue-600">{stats.active}</span>
             </div>
             {stats.active > 0 && (
-              <Progress value={100} className="h-2" indicatorClassName="bg-blue-500" />
+              <Progress value={100} className="h-2" />
             )}
           </div>
 
@@ -140,7 +140,7 @@ export function QueueStatus() {
               <span className="text-2xl font-bold text-yellow-600">{stats.waiting}</span>
             </div>
             {stats.waiting > 0 && (
-              <Progress value={100} className="h-2" indicatorClassName="bg-yellow-500" />
+              <Progress value={100} className="h-2" />
             )}
           </div>
 
@@ -154,7 +154,7 @@ export function QueueStatus() {
                 </div>
                 <span className="text-2xl font-bold text-orange-600">{stats.delayed}</span>
               </div>
-              <Progress value={100} className="h-2" indicatorClassName="bg-orange-500" />
+              <Progress value={100} className="h-2" />
             </div>
           )}
 
@@ -169,13 +169,6 @@ export function QueueStatus() {
             <Progress
               value={successRate}
               className="h-2"
-              indicatorClassName={
-                successRate >= 90
-                  ? 'bg-green-500'
-                  : successRate >= 70
-                  ? 'bg-yellow-500'
-                  : 'bg-red-500'
-              }
             />
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">

@@ -16,7 +16,6 @@ export interface LibraryTemplate {
   displayName: string;       // 显示名称（中文）
   description: string;       // 模板描述
   displayField: string;      // 在列表中显示的主要字段名
-  category?: string;         // 模板分类（可选）
   schema: object;            // JSON Schema 定义
   exampleEntry: object;      // 示例条目
   structureType: 'standard' | 'nested_array'; // 数据结构类型
@@ -31,7 +30,6 @@ const characterTemplate: LibraryTemplate = {
   displayName: '人物',
   description: '角色人物定义，包含外貌、服装、配色规则等',
   displayField: 'name',
-  category: 'core',
   structureType: 'standard',
   schema: {
     type: 'object',
@@ -122,7 +120,6 @@ const poseTemplate: LibraryTemplate = {
   displayName: '姿态',
   description: '人物姿态定义，包含身体方向、头部方向、手臂和腿部位置等',
   displayField: 'pose_name',
-  category: 'core',
   structureType: 'standard',
   schema: {
     type: 'object',
@@ -185,7 +182,6 @@ const sceneTemplate: LibraryTemplate = {
   displayName: '场景',
   description: '场景定义，包含必要物品、可选物品、相机预设等',
   displayField: 'scene',
-  category: 'core',
   structureType: 'standard',
   schema: {
     type: 'object',
@@ -262,7 +258,6 @@ const themeTemplate: LibraryTemplate = {
   displayName: '主题',
   description: '主题定义，包含调色板、氛围、装饰物品等',
   displayField: 'theme',
-  category: 'styling',
   structureType: 'standard',
   schema: {
     type: 'object',
@@ -354,7 +349,6 @@ const styleTemplate: LibraryTemplate = {
   displayName: '画风',
   description: '画风定义，包含时代风格、渲染技术、色彩特征等',
   displayField: 'era_style',
-  category: 'styling',
   structureType: 'standard',
   schema: {
     type: 'object',
@@ -430,7 +424,6 @@ const decorativePropsTemplate: LibraryTemplate = {
   displayName: '装饰小物',
   description: '装饰道具库，使用特殊的嵌套数组结构',
   displayField: 'name',
-  category: 'assets',
   structureType: 'nested_array', // 特殊结构类型
   schema: {
     type: 'object',
@@ -505,11 +498,6 @@ export const LIBRARY_TEMPLATES: LibraryTemplate[] = [
 // 根据 name 获取模板
 export function getTemplateByName(name: string): LibraryTemplate | undefined {
   return LIBRARY_TEMPLATES.find(template => template.name === name);
-}
-
-// 根据分类获取模板列表
-export function getTemplatesByCategory(category: string): LibraryTemplate[] {
-  return LIBRARY_TEMPLATES.filter(template => template.category === category);
 }
 
 // 获取所有模板名称列表

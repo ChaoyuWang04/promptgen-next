@@ -109,13 +109,6 @@ export function ProviderStatus() {
                 <Progress
                   value={provider.successRate}
                   className="h-2"
-                  indicatorClassName={
-                    provider.successRate >= 90
-                      ? 'bg-green-500'
-                      : provider.successRate >= 70
-                      ? 'bg-yellow-500'
-                      : 'bg-red-500'
-                  }
                 />
               </div>
 

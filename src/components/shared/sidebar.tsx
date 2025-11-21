@@ -13,6 +13,7 @@ import {
   Database,
   Sparkles,
   Image,
+  Layers,
   FileCode2,
   Settings,
   Activity,
@@ -48,6 +49,11 @@ const navItems: NavItem[] = [
     title: '图片管理',
     href: '/images',
     icon: Image,
+  },
+  {
+    title: '组合管理',
+    href: '/combinations',
+    icon: Layers,
   },
   {
     title: '模板编辑器',
@@ -93,14 +99,16 @@ export function Sidebar() {
             const isActive = pathname === item.href;
 
             return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive ? 'secondary' : 'ghost'}
-                  className={cn(
-                    'w-full justify-start gap-3 relative',
-                    isActive && 'bg-secondary font-semibold border-l-4 border-primary pl-2.5'
-                  )}
-                >
+              <Button
+                key={item.href}
+                variant={isActive ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start gap-3 relative',
+                  isActive && 'bg-secondary font-semibold border-l-4 border-primary pl-2.5'
+                )}
+                asChild
+              >
+                <Link href={item.href}>
                   <Icon className={cn(
                     "h-4 w-4",
                     isActive && "text-primary"
@@ -111,8 +119,8 @@ export function Sidebar() {
                       {item.badge}
                     </span>
                   )}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             );
           })}
         </nav>
@@ -125,21 +133,23 @@ export function Sidebar() {
             const isActive = pathname === item.href;
 
             return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive ? 'secondary' : 'ghost'}
-                  className={cn(
-                    'w-full justify-start gap-3 relative',
-                    isActive && 'bg-secondary font-semibold border-l-4 border-primary pl-2.5'
-                  )}
-                >
+              <Button
+                key={item.href}
+                variant={isActive ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start gap-3 relative',
+                  isActive && 'bg-secondary font-semibold border-l-4 border-primary pl-2.5'
+                )}
+                asChild
+              >
+                <Link href={item.href}>
                   <Icon className={cn(
                     "h-4 w-4",
                     isActive && "text-primary"
                   )} />
                   <span>{item.title}</span>
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             );
           })}
         </nav>

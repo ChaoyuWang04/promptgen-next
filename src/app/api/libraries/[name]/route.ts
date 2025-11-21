@@ -376,7 +376,6 @@ export async function PUT(
  *   "displayName": string,
  *   "description": string,
  *   "displayField": string,
- *   "category": string,
  *   "order": number,
  *   "schema": object,
  *   "isActive": boolean
@@ -421,9 +420,6 @@ export async function PATCH(
     }
     if (body.displayField !== undefined) {
       updateData.displayField = body.displayField;
-    }
-    if (body.category !== undefined) {
-      updateData.category = body.category;
     }
     if (body.order !== undefined) {
       updateData.order = body.order;

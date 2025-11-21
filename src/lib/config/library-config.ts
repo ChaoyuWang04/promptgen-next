@@ -80,7 +80,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
   {
     name: 'pose',
     displayName: '姿态',
-    displayField: 'pose_name',
+    displayField: 'name',
     type: 'required',
     order: 2,
     structureType: 'standard',
@@ -89,7 +89,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
   {
     name: 'scene',
     displayName: '场景',
-    displayField: 'scene_name',
+    displayField: 'name',
     type: 'required',
     order: 3,
     structureType: 'standard',
@@ -98,7 +98,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
   {
     name: 'theme',
     displayName: '主题',
-    displayField: 'theme_name',
+    displayField: 'name',
     type: 'required',
     order: 4,
     structureType: 'standard',
@@ -107,7 +107,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
   {
     name: 'style',
     displayName: '画风',
-    displayField: 'style_name',
+    displayField: 'era_style',
     type: 'required',
     order: 5,
     structureType: 'standard',

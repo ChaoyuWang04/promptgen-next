@@ -27,7 +27,6 @@ export const dynamic = 'force-dynamic';
  *     structureType: 'standard' | 'nested_array',
  *     createdAt: string,
  *     updatedAt: string,
- *     category?: string,
  *     description?: string
  *   }
  * }
@@ -84,7 +83,6 @@ export async function GET(
       displayName: library.displayName,
       description: library.description,
       displayField: library.displayField,
-      category: library.category,
       entryCount,
       schemaVersion: library.schemaVersion,
       isActive: library.isActive,

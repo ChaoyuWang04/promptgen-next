@@ -564,10 +564,6 @@ export function LibraryConfigDialog({
                       <span className="font-medium">{stats.displayName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">分类:</span>
-                      <span>{stats.category || '未分类'}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-muted-foreground">状态:</span>
                       <Badge variant={stats.isActive ? 'default' : 'secondary'}>
                         {stats.isActive ? '启用' : '禁用'}

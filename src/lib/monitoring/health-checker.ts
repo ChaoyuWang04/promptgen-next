@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '@/lib/db/prisma';
-import { ProviderManager } from '@/lib/providers/provider-manager';
+import { ProviderManager, createProviderManagerFromEnv } from '@/lib/providers/provider-manager';
 import { getQueueStats } from '@/lib/queue/image-generation-queue';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -30,7 +30,7 @@ export class HealthChecker {
    */
   private static getProviderManager(): ProviderManager {
     if (!this.providerManager) {
-      this.providerManager = ProviderManager.getInstance();
+      this.providerManager = createProviderManagerFromEnv();
     }
     return this.providerManager;
   }
@@ -138,9 +138,6 @@ export class HealthChecker {
       // Test database connection with a simple query
       await prisma.$queryRaw`SELECT 1`;
 
-      // Get connection pool metrics (if available)
-      const metrics = await prisma.$metrics.json();
-
       const responseTime = Date.now() - startTime;
 
       return {
@@ -152,9 +149,7 @@ export class HealthChecker {
             : 'Database is operational',
         lastChecked: new Date(),
         responseTime,
-        metadata: {
-          metrics,
-        },
+        metadata: {},
       };
     } catch (error) {
       return {
@@ -200,7 +195,6 @@ export class HealthChecker {
         active: stats.active,
         completed: stats.completed,
         failed: stats.failed,
-        delayed: stats.delayed,
       };
     } catch (error) {
       return {

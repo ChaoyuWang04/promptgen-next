@@ -49,9 +49,20 @@ export function getRedisConnection(): ConnectionOptions {
 export async function testRedisConnection(): Promise<boolean> {
   try {
     const { default: IORedis } = await import('ioredis');
-    const connection = getRedisConnection();
+    const config = getQueueConfig();
 
-    const redis = new IORedis(connection);
+    const redis = new IORedis({
+      host: config.host,
+      port: config.port,
+      password: config.password,
+      db: config.db,
+      retryStrategy: (times: number) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      enableReadyCheck: true,
+      maxRetriesPerRequest: 3,
+    });
 
     // Test ping
     const pong = await redis.ping();

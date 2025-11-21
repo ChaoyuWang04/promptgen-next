@@ -25,13 +25,13 @@ export class ImageSyncChecker implements IChecker {
     try {
       const records = await prisma.record.findMany({
         include: {
-          imageVariants: true,
+          variants: true,
         },
       });
 
       for (const record of records) {
         // Check if imageGenerated is true but no variants exist
-        if (record.imageGenerated && record.imageVariants.length === 0) {
+        if (record.imageGenerated && record.variants.length === 0) {
           issues.push({
             id: uuidv4(),
             type: IssueType.IMAGE_SYNC,
@@ -46,7 +46,7 @@ export class ImageSyncChecker implements IChecker {
         }
 
         // Check if variants exist but imageGenerated is false
-        if (!record.imageGenerated && record.imageVariants.length > 0) {
+        if (!record.imageGenerated && record.variants.length > 0) {
           issues.push({
             id: uuidv4(),
             type: IssueType.IMAGE_SYNC,
@@ -56,7 +56,7 @@ export class ImageSyncChecker implements IChecker {
             entityType: 'Record',
             details: {
               imageId: record.imageId,
-              variantCount: record.imageVariants.length,
+              variantCount: record.variants.length,
             },
             canAutoRepair: true,
             repairAction: 'Set imageGenerated to true',

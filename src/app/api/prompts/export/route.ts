@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch prompts
     const prompts = await prisma.prompt.findMany({
-      where: imageIds ? { imageId: { in: imageIds } } : undefined,
+      where: imageIds ? { record: { imageId: { in: imageIds } } } : undefined,
       include: {
         record: {
           select: {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       const textContent = prompts
         .map(
           (p) =>
-            `Image ID: ${p.imageId}\nType: ${p.type}\n\nChinese:\n${p.promptCn}\n\nEnglish:\n${p.promptEn}\n\n${'='.repeat(80)}\n`
+            `Image ID: ${p.record.imageId}\nType: ${p.type}\n\nChinese:\n${p.promptCn}\n\nEnglish:\n${p.promptEn}\n\n${'='.repeat(80)}\n`
         )
         .join('\n');
 
@@ -71,14 +71,14 @@ export async function POST(request: NextRequest) {
       // Add separate text files for each prompt
       prompts.forEach((p) => {
         builder.addTextFile(
-          `${p.imageId}_${p.type}.txt`,
+          `${p.record.imageId}_${p.type}.txt`,
           `Type: ${p.type}\n\nChinese:\n${p.promptCn}\n\nEnglish:\n${p.promptEn}`
         );
       });
 
       const zipBuffer = await builder.generateBuffer();
 
-      return new NextResponse(zipBuffer, {
+      return new NextResponse(zipBuffer as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': 'application/zip',

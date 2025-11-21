@@ -164,7 +164,7 @@ export async function POST(
       } else {
         // Merge objects
         const importedData = Array.isArray(importResult.entries)
-          ? importResult.entries.reduce((acc, entry) => {
+          ? importResult.entries.reduce((acc: Record<string, unknown>, entry) => {
               if (typeof entry === 'object' && entry !== null) {
                 const entryObj = entry as Record<string, unknown>;
                 const id = entryObj.id as string;
@@ -173,7 +173,7 @@ export async function POST(
                 }
               }
               return acc;
-            }, {} as Record<string, unknown>)
+            }, {})
           : importResult.entries;
 
         newEntries = {

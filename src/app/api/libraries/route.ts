@@ -31,7 +31,6 @@ const CreateLibrarySchema = z.object({
     .max(100, 'Display name must be at most 100 characters'),
   description: z.string().optional(),
   displayField: z.string().default('name'),
-  category: z.string().optional(),
   // order 字段由系统自动分配，不接受用户输入
   templateName: z.string().optional(), // 如果提供，从模板创建
   schema: z.record(z.unknown()).optional(), // 如果不使用模板，必须提供 schema
@@ -53,7 +52,6 @@ type CreateLibraryInput = z.infer<typeof CreateLibrarySchema>;
  *   displayName: string,       // 显示名称
  *   description?: string,      // 描述
  *   displayField?: string,     // 显示字段名
- *   category?: string,         // 分类
  *   templateName?: string,     // 模板名称（从模板创建）
  *   schema?: object,           // JSON Schema（自定义）
  *   entries?: object | array   // 初始条目（可选）
@@ -180,7 +178,6 @@ export async function POST(request: NextRequest) {
         displayName: input.displayName,
         description: input.description,
         displayField: input.displayField,
-        category: input.category,
         order: nextOrder,
         schema: schema as any, // JSON 类型
         entries: entries as any, // JSON 类型

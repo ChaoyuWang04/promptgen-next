@@ -43,6 +43,8 @@ export const ProviderAttemptSchema = z.object({
 export const RecordSchema = z.object({
   id: z.string().cuid().optional(),
   imageId: z.string(),
+  combinationId: z.string().cuid().nullable().optional(),
+  variantNumber: z.number().int().positive().default(1),
   libraryIds: LibraryIdsSchema,
   outfitMinorState: OutfitMinorStateSchema,
   usedDecorations: UsedDecorationsSchema,

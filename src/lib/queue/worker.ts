@@ -88,12 +88,9 @@ async function updateBatchProgress(batchId: string): Promise<void> {
     }
 
     // Count completed images
-    const completedCount = batch.completedImageIds?.length || 0;
-    const failedCount = batch.failedImageIds?.length || 0;
+    const completedCount = batch.completed;
+    const failedCount = batch.failed;
     const processedCount = completedCount + failedCount;
-
-    // Update progress percentage
-    const progress = Math.round((processedCount / batch.totalImages) * 100);
 
     // Determine status
     let status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' = 'IN_PROGRESS';
@@ -105,12 +102,11 @@ async function updateBatchProgress(batchId: string): Promise<void> {
     await prisma.imageBatch.update({
       where: { id: batchId },
       data: {
-        progress,
         status,
-        completedAt: status !== 'IN_PROGRESS' ? new Date() : null,
       },
     });
 
+    const progress = Math.round((processedCount / batch.totalImages) * 100);
     console.log(
       `[Worker] Updated batch ${batchId}: ${processedCount}/${batch.totalImages} (${progress}%)`
     );
@@ -131,18 +127,12 @@ async function recordBatchFailure(
     await prisma.imageBatch.update({
       where: { id: batchId },
       data: {
-        failedImageIds: {
-          push: imageId,
-        },
-        errors: {
-          push: {
-            imageId,
-            error: error instanceof Error ? error.message : String(error),
-            timestamp: new Date().toISOString(),
-          },
+        failed: {
+          increment: 1,
         },
       },
     });
+    console.error(`[Worker] Image generation failed for ${imageId}:`, error);
   } catch (dbError) {
     console.error(
       `[Worker] Failed to record batch failure:`,

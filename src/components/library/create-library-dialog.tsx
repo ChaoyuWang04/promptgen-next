@@ -198,7 +198,7 @@ export function CreateLibraryDialog({
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="text-xs text-muted-foreground">
-                      分类: {template.category || '未分类'} • 类型: {template.structureType === 'standard' ? '标准' : '嵌套数组'}
+                      类型: {template.structureType === 'standard' ? '标准' : '嵌套数组'}
                     </CardContent>
                   </Card>
                 ))}

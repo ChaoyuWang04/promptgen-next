@@ -53,7 +53,6 @@ model Library {
 
   // 显示和组织
   order         Int      @unique @default(0)     // 显示排序（数字越小越靠前，全局唯一）
-  category      String?                           // 库分类（可选）
   isActive      Boolean  @default(true)           // 是否启用
 
   // 元数据

@@ -309,7 +309,7 @@ export class ImageGenerator {
       data: {
         imageGenerated: true,
         providerUsed: provider,
-        providerAttempts: attempts,
+        providerAttempts: attempts as any,
       },
     });
 
@@ -330,7 +330,7 @@ export class ImageGenerator {
       await prisma.record.update({
         where: { id: recordId },
         data: {
-          providerAttempts: attempts,
+          providerAttempts: attempts as any,
         },
       });
     } catch (dbError) {

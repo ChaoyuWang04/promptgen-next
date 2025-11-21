@@ -47,52 +47,52 @@ export class DuplicateChecker implements IChecker {
         }
       }
 
-      // Check for duplicate prompts (same imageId + type)
+      // Check for duplicate prompts (same recordId + type)
       const prompts = await prisma.prompt.findMany();
       const promptKeys = new Map<string, number>();
 
       for (const prompt of prompts) {
-        const key = `${prompt.imageId}_${prompt.type}`;
+        const key = `${prompt.recordId}_${prompt.type}`;
         promptKeys.set(key, (promptKeys.get(key) || 0) + 1);
       }
 
       for (const [key, count] of promptKeys) {
         if (count > 1) {
-          const [imageId, type] = key.split('_');
+          const [recordId, type] = key.split('_');
           issues.push({
             id: uuidv4(),
             type: IssueType.DUPLICATE_RECORDS,
             severity: IssueSeverity.WARNING,
-            description: `Duplicate prompt found for ${imageId} (type: ${type})`,
-            recordId: imageId,
+            description: `Duplicate prompt found for record ${recordId} (type: ${type})`,
+            recordId: recordId,
             entityType: 'Prompt',
-            details: { imageId, type, count },
+            details: { recordId, type, count },
             canAutoRepair: true,
             repairAction: 'Keep newest prompt, delete older duplicates',
           });
         }
       }
 
-      // Check for duplicate image variants (same imageId + version)
+      // Check for duplicate image variants (same recordId + version)
       const imageVariants = await prisma.imageVariant.findMany();
       const variantKeys = new Map<string, number>();
 
       for (const variant of imageVariants) {
-        const key = `${variant.imageId}_${variant.version}`;
+        const key = `${variant.recordId}_${variant.version}`;
         variantKeys.set(key, (variantKeys.get(key) || 0) + 1);
       }
 
       for (const [key, count] of variantKeys) {
         if (count > 1) {
-          const [imageId, version] = key.split('_');
+          const [recordId, version] = key.split('_');
           issues.push({
             id: uuidv4(),
             type: IssueType.DUPLICATE_RECORDS,
             severity: IssueSeverity.WARNING,
-            description: `Duplicate image variant found for ${imageId} (version: ${version})`,
-            recordId: imageId,
+            description: `Duplicate image variant found for record ${recordId} (version: ${version})`,
+            recordId: recordId,
             entityType: 'ImageVariant',
-            details: { imageId, version, count },
+            details: { recordId, version, count },
             canAutoRepair: true,
             repairAction: 'Keep newest variant, delete older duplicates',
           });
@@ -134,11 +134,11 @@ export class DuplicateChecker implements IChecker {
 
       try {
         if (issue.entityType === 'Prompt') {
-          const { imageId, type } = issue.details as any;
+          const { recordId, type } = issue.details as any;
 
           // Find all duplicate prompts
           const duplicates = await prisma.prompt.findMany({
-            where: { imageId, type },
+            where: { recordId, type },
             orderBy: { createdAt: 'desc' },
           });
 
@@ -153,12 +153,12 @@ export class DuplicateChecker implements IChecker {
             message: `Deleted ${duplicates.length - 1} duplicate prompts`,
           });
         } else if (issue.entityType === 'ImageVariant') {
-          const { imageId, version } = issue.details as any;
+          const { recordId, version } = issue.details as any;
 
           // Find all duplicate variants
           const duplicates = await prisma.imageVariant.findMany({
-            where: { imageId, version: parseInt(version) },
-            orderBy: { createdAt: 'desc' },
+            where: { recordId, version: parseInt(version) },
+            orderBy: { generatedAt: 'desc' },
           });
 
           // Keep the newest, delete others

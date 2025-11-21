@@ -108,7 +108,7 @@ export class ComboManager {
                 style: style.id,
               };
 
-              const imageId = generateImageId(libraryIds);
+              const imageId = await generateImageId(libraryIds);
 
               combinations.push({
                 imageId,

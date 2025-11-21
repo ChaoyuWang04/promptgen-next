@@ -13,23 +13,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import {
-  isValidLibraryName,
-  getLibraryConfig,
-  getLibraryDisplayName,
-  type LibraryName,
-} from '@/lib/config/library-config';
 
 export const dynamic = 'force-dynamic';
-
-/**
- * Type guard for library name validation
- */
-function validateLibraryName(name: string): asserts name is LibraryName {
-  if (!isValidLibraryName(name)) {
-    throw new Error(`未知的库名称: ${name}`);
-  }
-}
 
 /**
  * GET /api/libraries/[name]/[id]
@@ -46,15 +31,6 @@ export async function GET(
 ) {
   try {
     const { name, id } = await params;
-    validateLibraryName(name);
-
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        { error: `库配置不存在: ${name}` },
-        { status: 404 }
-      );
-    }
 
     // Get library
     const library = await prisma.library.findUnique({
@@ -64,7 +40,7 @@ export async function GET(
 
     if (!library) {
       return NextResponse.json(
-        { error: `库不存在: ${getLibraryDisplayName(name)}` },
+        { error: `库不存在: ${name}` },
         { status: 404 }
       );
     }
@@ -72,7 +48,10 @@ export async function GET(
     const entries = library.entries as Record<string, any>;
     let entry: any;
 
-    if (config.structureType === 'nested_array') {
+    // Determine structure type from entries
+    const isNestedArray = entries.common_props && Array.isArray(entries.common_props);
+
+    if (isNestedArray) {
       // Search in common_props array
       const commonProps = entries.common_props || [];
       entry = commonProps.find((item: any) => item.id === id);
@@ -88,16 +67,12 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(entry);
+    return NextResponse.json({
+      success: true,
+      data: entry,
+    });
   } catch (error) {
     console.error(`[GET /api/libraries/${(await params).name}/${(await params).id}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {
@@ -125,15 +100,6 @@ export async function PUT(
 ) {
   try {
     const { name, id } = await params;
-    validateLibraryName(name);
-
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        { error: `库配置不存在: ${name}` },
-        { status: 404 }
-      );
-    }
 
     // Parse request body
     const body = await request.json();
@@ -154,7 +120,7 @@ export async function PUT(
 
     if (!library) {
       return NextResponse.json(
-        { error: `库不存在: ${getLibraryDisplayName(name)}` },
+        { error: `库不存在: ${name}` },
         { status: 404 }
       );
     }
@@ -163,7 +129,10 @@ export async function PUT(
     let newEntries: Record<string, any>;
     let found = false;
 
-    if (config.structureType === 'nested_array') {
+    // Determine structure type from entries
+    const isNestedArray = currentEntries.common_props && Array.isArray(currentEntries.common_props);
+
+    if (isNestedArray) {
       // Update in common_props array
       const commonProps = currentEntries.common_props || [];
       const updatedProps = commonProps.map((item: any) => {
@@ -212,19 +181,14 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      library_name: updated.name,
-      entry_id: id,
-      updated_at: updated.updatedAt,
+      data: {
+        library_name: updated.name,
+        entry_id: id,
+        updated_at: updated.updatedAt,
+      },
     });
   } catch (error) {
     console.error(`[PUT /api/libraries/${(await params).name}/${(await params).id}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {
@@ -247,15 +211,6 @@ export async function DELETE(
 ) {
   try {
     const { name, id } = await params;
-    validateLibraryName(name);
-
-    const config = getLibraryConfig(name);
-    if (!config) {
-      return NextResponse.json(
-        { error: `库配置不存在: ${name}` },
-        { status: 404 }
-      );
-    }
 
     // Get current library
     const library = await prisma.library.findUnique({
@@ -265,7 +220,7 @@ export async function DELETE(
 
     if (!library) {
       return NextResponse.json(
-        { error: `库不存在: ${getLibraryDisplayName(name)}` },
+        { error: `库不存在: ${name}` },
         { status: 404 }
       );
     }
@@ -274,7 +229,10 @@ export async function DELETE(
     let newEntries: Record<string, any>;
     let found = false;
 
-    if (config.structureType === 'nested_array') {
+    // Determine structure type from entries
+    const isNestedArray = currentEntries.common_props && Array.isArray(currentEntries.common_props);
+
+    if (isNestedArray) {
       // Remove from common_props array
       const commonProps = currentEntries.common_props || [];
       const filteredProps = commonProps.filter((item: any) => {
@@ -329,13 +287,6 @@ export async function DELETE(
     });
   } catch (error) {
     console.error(`[DELETE /api/libraries/${(await params).name}/${(await params).id}] Error:`, error);
-
-    if (error instanceof Error && error.message.startsWith('未知的库名称')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
 
     return NextResponse.json(
       {

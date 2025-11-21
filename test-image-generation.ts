@@ -102,12 +102,11 @@ async function main() {
     // Verify database was updated
     const updatedRecord = await prisma.record.findUnique({
       where: { imageId: testImageId },
-      include: { imageVariants: true },
+      include: { variants: true },
     });
     console.log('\n📊 Database verification:');
     console.log('  - Image generated:', updatedRecord?.imageGenerated);
-    console.log('  - Variants count:', updatedRecord?.imageVariants.length);
-    console.log('  - Latest version:', updatedRecord?.latestVersion);
+    console.log('  - Variants count:', updatedRecord?.variants.length);
 
   } catch (error) {
     console.error('\n❌ Test failed:', error);

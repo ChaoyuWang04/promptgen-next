@@ -26,6 +26,16 @@ export interface TemplateVariable {
   example?: string;
 }
 
+export interface TemplateVariableWarning {
+  library: string;
+  message: string;
+}
+
+export interface TemplateVariablesResponse {
+  variables: TemplateVariable[];
+  warnings: TemplateVariableWarning[];
+}
+
 export interface PreviewRequest {
   template_content: string;
   library_ids: Record<string, string>;
@@ -68,9 +78,21 @@ export function useTemplate(id: string) {
  * Hook to fetch template variables
  */
 export function useTemplateVariables(type: 'main' | 'diff' = 'main') {
-  return useQuery<TemplateVariable[]>({
+  return useQuery<TemplateVariablesResponse>({
     queryKey: queryKeys.templates.variables(type),
-    queryFn: () => api.get<TemplateVariable[]>(`/api/templates/variables?type=${type}`),
+    queryFn: async () => {
+      const response = await fetch(`/api/templates/variables?type=${type}`);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to fetch variables');
+      }
+
+      return {
+        variables: result.data || [],
+        warnings: result.warnings || [],
+      };
+    },
   });
 }
 
@@ -82,7 +104,7 @@ export function usePreviewTemplate() {
 
   return useMutation({
     mutationFn: (request: PreviewRequest) =>
-      api.post<PreviewResponse>('/api/templates/preview', request),
+      api.post<PreviewResponse>('/api/templates/render', request),
     onError: (error: Error) => {
       toast({
         title: '预览失败',

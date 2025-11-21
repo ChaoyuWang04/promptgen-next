@@ -15,60 +15,117 @@ import { ENABLED_LIBRARIES } from '@/lib/config/library-config';
 export const dynamic = 'force-dynamic';
 
 interface VariableMetadata {
-  path: string;
+  name: string;
   type: string;
   description: string;
-  example: string;
-  requires_filter: boolean;
+  example?: string;
   category?: 'MAIN' | 'DIFF' | 'BOTH';
 }
 
-/**
- * Generate variable metadata from library structure
- */
-async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<VariableMetadata[]> {
-  const variables: VariableMetadata[] = [];
+interface Warning {
+  library: string;
+  message: string;
+}
 
-  // Load one example entry from each library to infer structure
+interface VariablesResponse {
+  variables: VariableMetadata[];
+  warnings: Warning[];
+}
+
+/**
+ * Infer TypeScript type from JSON Schema type
+ */
+function inferTypeFromSchema(schemaProp: any): string {
+  if (!schemaProp.type) return 'unknown';
+
+  const type = schemaProp.type;
+  if (type === 'array') {
+    const itemType = schemaProp.items?.type || 'unknown';
+    return `array<${itemType}>`;
+  }
+  return type;
+}
+
+/**
+ * Generate example value from schema property
+ */
+function generateExampleFromSchema(schemaProp: any, fieldName: string): string {
+  if (schemaProp.example) return String(schemaProp.example);
+
+  const type = schemaProp.type;
+  switch (type) {
+    case 'string':
+      return `示例${fieldName}`;
+    case 'number':
+    case 'integer':
+      return '123';
+    case 'boolean':
+      return 'true';
+    case 'array':
+      return '["item1", "item2"]';
+    case 'object':
+      return '{}';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Generate variable metadata from library JSON schemas
+ */
+async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<VariablesResponse> {
+  const variables: VariableMetadata[] = [];
+  const warnings: Warning[] = [];
+
+  // Load all libraries and extract variables from their JSON schemas
   for (const libConfig of ENABLED_LIBRARIES) {
     const library = await prisma.library.findUnique({
       where: { name: libConfig.name },
-      select: { entries: true },
+      select: { schema: true, name: true },
     });
 
-    if (!library) continue;
-
-    const entries = library.entries as Record<string, any>;
-    let sampleEntry: any;
-
-    // Get sample entry
-    if (libConfig.structureType === 'nested_array') {
-      const commonProps = entries.common_props || [];
-      sampleEntry = commonProps[0];
-    } else {
-      const firstKey = Object.keys(entries)[0];
-      sampleEntry = entries[firstKey];
+    if (!library) {
+      warnings.push({
+        library: libConfig.name,
+        message: `库 "${libConfig.displayName}" 不存在于数据库中`,
+      });
+      continue;
     }
 
-    if (!sampleEntry) continue;
+    // Check if schema exists
+    if (!library.schema) {
+      warnings.push({
+        library: libConfig.name,
+        message: `库 "${libConfig.displayName}" 缺少 JSON Schema 定义，无法生成变量参考`,
+      });
+      continue;
+    }
 
-    // Generate variables from sample entry
-    for (const [key, value] of Object.entries(sampleEntry)) {
-      const variablePath = `${libConfig.name}.${key}`;
-      const type = Array.isArray(value)
-        ? 'array'
-        : typeof value === 'object' && value !== null
-        ? 'object'
-        : (typeof value as any);
+    // Parse schema
+    const schema = library.schema as any;
+
+    if (!schema.properties || typeof schema.properties !== 'object') {
+      warnings.push({
+        library: libConfig.name,
+        message: `库 "${libConfig.displayName}" 的 JSON Schema 格式无效（缺少 properties 字段）`,
+      });
+      continue;
+    }
+
+    // Extract variables from schema properties
+    for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      const prop = fieldSchema as any;
+      const variableName = `${libConfig.name}.${fieldName}`;
+      const type = inferTypeFromSchema(prop);
+      const isArray = prop.type === 'array';
 
       variables.push({
-        path: variablePath,
-        type,
-        description: `${libConfig.displayName} - ${key}`,
-        requires_filter: Array.isArray(value),
-        example: Array.isArray(value)
-          ? `{{${variablePath} | join}}`
-          : `{{${variablePath}}}`,
+        name: variableName,
+        type: type,
+        description: prop.description || `${libConfig.displayName} - ${fieldName}`,
+        example: isArray
+          ? `{{${variableName} | join}}`
+          : `{{${variableName}}}`,
         category: 'BOTH', // Available in both MAIN and DIFF templates
       });
     }
@@ -77,22 +134,21 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
   // Add module shortcuts (only for MAIN templates)
   if (!category || category === 'MAIN') {
     const modules = [
-      { name: 'character', desc: '角色模块 - 完整角色描述' },
-      { name: 'pose', desc: '姿态模块 - 完整姿态描述' },
-      { name: 'scene', desc: '场景模块 - 完整场景描述' },
-      { name: 'theme', desc: '主题模块 - 完整主题描述' },
-      { name: 'lighting', desc: '光照模块 - 光照描述' },
-      { name: 'style', desc: '画风模块 - 完整画风描述' },
-      { name: 'composition', desc: '构图模块 - 构图规则' },
+      { name: 'character', desc: '角色模块 - 完整角色描述（组合多个字段）' },
+      { name: 'pose', desc: '姿态模块 - 完整姿态描述（组合多个字段）' },
+      { name: 'scene', desc: '场景模块 - 完整场景描述（组合多个字段）' },
+      { name: 'theme', desc: '主题模块 - 完整主题描述（组合多个字段）' },
+      { name: 'lighting', desc: '光照模块 - 完整光照描述（从相关字段生成）' },
+      { name: 'style', desc: '画风模块 - 完整画风描述（组合多个字段）' },
+      { name: 'composition', desc: '构图模块 - 构图规则（从相关字段生成）' },
     ];
 
     for (const module of modules) {
       variables.push({
-        path: `@module:${module.name}`,
+        name: `@module:${module.name}`,
         type: 'string',
         description: module.desc,
         example: `{{@module:${module.name}}}`,
-        requires_filter: false,
         category: 'MAIN',
       });
     }
@@ -101,34 +157,61 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
   // Add DIFF-specific variables
   if (!category || category === 'DIFF') {
     const diffVariables = [
-      { path: 'outfit_state', desc: 'Outfit状态对象', type: 'object' },
-      { path: 'new_outfit_state', desc: '新Outfit状态对象', type: 'object' },
-      { path: 'color_changes', desc: '颜色变化列表', type: 'array' },
-      { path: 'decorations', desc: '装饰列表', type: 'array' },
-      { path: 'new_decorations', desc: '新装饰列表', type: 'array' },
-      { path: 'all_decorations', desc: '所有装饰列表', type: 'array' },
+      {
+        path: 'outfit_state',
+        desc: 'Outfit 当前状态对象（包含当前服装的所有属性）',
+        type: 'object'
+      },
+      {
+        path: 'new_outfit_state',
+        desc: 'Outfit 新状态对象（包含修改后服装的所有属性）',
+        type: 'object'
+      },
+      {
+        path: 'color_changes',
+        desc: '颜色变化列表（记录哪些颜色属性发生了变化）',
+        type: 'array<string>'
+      },
+      {
+        path: 'decorations',
+        desc: '当前装饰列表（当前已有的装饰元素）',
+        type: 'array<string>'
+      },
+      {
+        path: 'new_decorations',
+        desc: '新增装饰列表（本次新添加的装饰元素）',
+        type: 'array<string>'
+      },
+      {
+        path: 'all_decorations',
+        desc: '所有装饰列表（包括当前和新增的所有装饰）',
+        type: 'array<string>'
+      },
     ];
 
     for (const diffVar of diffVariables) {
+      const isArray = diffVar.type.startsWith('array');
       variables.push({
-        path: diffVar.path,
+        name: diffVar.path,
         type: diffVar.type,
         description: diffVar.desc,
-        example: diffVar.type === 'array'
+        example: isArray
           ? `{{${diffVar.path} | join}}`
           : `{{${diffVar.path}}}`,
-        requires_filter: diffVar.type === 'array',
         category: 'DIFF',
       });
     }
   }
 
   // Filter by category if specified
-  if (category) {
-    return variables.filter(v => v.category === category || v.category === 'BOTH');
-  }
+  const filteredVariables = category
+    ? variables.filter(v => v.category === category || v.category === 'BOTH')
+    : variables;
 
-  return variables;
+  return {
+    variables: filteredVariables,
+    warnings,
+  };
 }
 
 /**
@@ -153,11 +236,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const variables = await generateVariableMetadata(type);
+    const result = await generateVariableMetadata(type);
 
     return NextResponse.json({
       success: true,
-      data: variables,
+      data: result.variables,
+      warnings: result.warnings,
     });
   } catch (error) {
     console.error('[GET /api/templates/variables] Error:', error);

@@ -77,10 +77,6 @@ export class BatchGenerator {
         imageIds,
         totalImages: imageIds.length,
         status: 'PENDING',
-        progress: 0,
-        completedImageIds: [],
-        failedImageIds: [],
-        errors: [],
       },
     });
 
@@ -99,7 +95,6 @@ export class BatchGenerator {
         where: { id: batch.id },
         data: {
           status: 'IN_PROGRESS',
-          jobIds,
         },
       });
 
@@ -119,15 +114,10 @@ export class BatchGenerator {
         where: { id: batch.id },
         data: {
           status: 'FAILED',
-          errors: [
-            {
-              error: error instanceof Error ? error.message : String(error),
-              timestamp: new Date().toISOString(),
-            },
-          ],
         },
       });
 
+      console.error(`[BatchGenerator] Failed to queue batch ${batch.id}:`, error);
       throw error;
     }
   }
@@ -166,17 +156,12 @@ export class BatchGenerator {
     return {
       batchId: batch.id,
       totalImages: batch.totalImages,
-      completedImageIds: batch.completedImageIds || [],
-      failedImageIds: batch.failedImageIds || [],
-      completed: (batch.completedImageIds || []).length,
-      failed: (batch.failedImageIds || []).length,
+      completed: batch.completed,
+      failed: batch.failed,
       status: batch.status,
-      progress: batch.progress,
       queueStatus,
-      errors: batch.errors || [],
       createdAt: batch.createdAt,
       updatedAt: batch.updatedAt,
-      completedAt: batch.completedAt,
     };
   }
 

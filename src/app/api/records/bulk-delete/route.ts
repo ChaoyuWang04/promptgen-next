@@ -32,13 +32,13 @@ export async function POST(request: NextRequest) {
       if (cascade) {
         // Delete related prompts
         const promptsResult = await tx.prompt.deleteMany({
-          where: { imageId: { in: imageIds } },
+          where: { record: { imageId: { in: imageIds } } },
         });
         relatedDeleted.prompts = promptsResult.count;
 
         // Delete related image variants
         const variantsResult = await tx.imageVariant.deleteMany({
-          where: { imageId: { in: imageIds } },
+          where: { record: { imageId: { in: imageIds } } },
         });
         relatedDeleted.imageVariants = variantsResult.count;
       }

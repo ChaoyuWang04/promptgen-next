@@ -14,9 +14,9 @@ import { createQueueEvents } from '@/lib/queue/image-generation-queue';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { imageId: string } }
+  { params }: { params: Promise<{ imageId: string }> }
 ) {
-  const { imageId } = params;
+  const { imageId } = await params;
 
   console.log(`[API] SSE progress stream started for ${imageId}`);
 
@@ -64,7 +64,8 @@ export async function GET(
         // Listen for job progress
         queueEvents.on('progress', async ({ jobId, data }) => {
           // Check if this job is for our imageId
-          const job = await queueEvents.client.get(`bull:image-generation:${jobId}`);
+          const client = await queueEvents.client;
+          const job = await client.get(`bull:image-generation:${jobId}`);
           if (job && JSON.parse(job as string).imageId === imageId) {
             sendEvent('progress', {
               imageId,
@@ -98,7 +99,8 @@ export async function GET(
         queueEvents.on('failed', async ({ jobId, failedReason }) => {
           // Check if this job is for our imageId
           try {
-            const job = await queueEvents.client.get(`bull:image-generation:${jobId}`);
+            const client = await queueEvents.client;
+            const job = await client.get(`bull:image-generation:${jobId}`);
             if (job && JSON.parse(job as string).imageId === imageId) {
               sendEvent('failed', {
                 imageId,
