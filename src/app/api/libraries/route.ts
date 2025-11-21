@@ -32,7 +32,7 @@ const CreateLibrarySchema = z.object({
   description: z.string().optional(),
   displayField: z.string().default('name'),
   category: z.string().optional(),
-  order: z.number().int().min(0).default(0),
+  // order 字段由系统自动分配，不接受用户输入
   templateName: z.string().optional(), // 如果提供，从模板创建
   schema: z.record(z.unknown()).optional(), // 如果不使用模板，必须提供 schema
   entries: z.record(z.unknown()).or(z.array(z.unknown())).optional(), // 初始条目（可选）
@@ -54,11 +54,12 @@ type CreateLibraryInput = z.infer<typeof CreateLibrarySchema>;
  *   description?: string,      // 描述
  *   displayField?: string,     // 显示字段名
  *   category?: string,         // 分类
- *   order?: number,            // 排序
  *   templateName?: string,     // 模板名称（从模板创建）
  *   schema?: object,           // JSON Schema（自定义）
  *   entries?: object | array   // 初始条目（可选）
  * }
+ *
+ * 注意：order 字段由系统自动分配（MAX(order) + 1），不接受用户输入
  *
  * Response:
  * {
@@ -162,6 +163,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 自动计算下一个 order 值
+    const maxOrderResult = await prisma.library.aggregate({
+      _max: {
+        order: true,
+      },
+    });
+
+    // 如果数据库中没有库，从 0 开始；否则使用 MAX(order) + 1
+    const nextOrder = (maxOrderResult._max.order ?? -1) + 1;
+
     // 创建库
     const library = await prisma.library.create({
       data: {
@@ -170,7 +181,7 @@ export async function POST(request: NextRequest) {
         description: input.description,
         displayField: input.displayField,
         category: input.category,
-        order: input.order,
+        order: nextOrder,
         schema: schema as any, // JSON 类型
         entries: entries as any, // JSON 类型
         schemaVersion: '1.0',
