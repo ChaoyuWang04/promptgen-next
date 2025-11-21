@@ -11,12 +11,12 @@ import { useToast } from '@/hooks/use-toast';
 export interface Template {
   id: string;
   name: string;
-  type: 'main' | 'diff';
-  category: 'system' | 'user';
+  type: 'SYSTEM' | 'USER';
+  category: 'MAIN' | 'DIFF';
   content: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TemplateVariable {
@@ -39,7 +39,7 @@ export interface TemplateVariablesResponse {
 export interface PreviewRequest {
   template_content: string;
   library_ids: Record<string, string>;
-  type?: 'main' | 'diff';
+  type?: 'MAIN' | 'DIFF';
 }
 
 export interface PreviewResponse {
@@ -51,7 +51,7 @@ export interface PreviewResponse {
 /**
  * Hook to fetch templates list
  */
-export function useTemplates(type?: 'main' | 'diff', category?: 'system' | 'user') {
+export function useTemplates(type?: 'SYSTEM' | 'USER', category?: 'MAIN' | 'DIFF') {
   return useQuery<Template[]>({
     queryKey: queryKeys.templates.list(type, category),
     queryFn: () => {
@@ -77,7 +77,7 @@ export function useTemplate(id: string) {
 /**
  * Hook to fetch template variables
  */
-export function useTemplateVariables(type: 'main' | 'diff' = 'main') {
+export function useTemplateVariables(type: 'MAIN' | 'DIFF' = 'MAIN') {
   return useQuery<TemplateVariablesResponse>({
     queryKey: queryKeys.templates.variables(type),
     queryFn: async () => {
@@ -123,7 +123,7 @@ export function useCreateTemplate() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (template: Omit<Template, 'id' | 'created_at' | 'updated_at'>) =>
+    mutationFn: (template: Omit<Template, 'id' | 'createdAt' | 'updatedAt'>) =>
       api.post<Template>('/api/templates', template),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.templates.all });

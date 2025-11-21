@@ -1,9 +1,9 @@
 /**
  * Individual Template Endpoints
  *
- * GET    /api/templates/[name] - Get template by name
- * PUT    /api/templates/[name] - Update template
- * DELETE /api/templates/[name] - Delete template
+ * GET    /api/templates/[id] - Get template by id
+ * PUT    /api/templates/[id] - Update template
+ * DELETE /api/templates/[id] - Delete template
  *
  * Replaces Flask:
  * - GET    /api/schemes/get/<name>
@@ -17,19 +17,19 @@ import { prisma } from '@/lib/db/prisma';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/templates/[name]
+ * GET /api/templates/[id]
  *
- * Get a specific template by name.
+ * Get a specific template by id.
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ name: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { name } = await params;
+    const { id } = await params;
 
     const template = await prisma.template.findUnique({
-      where: { name },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -44,14 +44,14 @@ export async function GET(
 
     if (!template) {
       return NextResponse.json(
-        { error: `模板不存在: ${name}` },
+        { error: `模板不存在: ${id}` },
         { status: 404 }
       );
     }
 
     return NextResponse.json(template);
   } catch (error) {
-    console.error(`[GET /api/templates/${(await params).name}] Error:`, error);
+    console.error(`[GET /api/templates/${(await params).id}] Error:`, error);
 
     return NextResponse.json(
       {
@@ -64,7 +64,7 @@ export async function GET(
 }
 
 /**
- * PUT /api/templates/[name]
+ * PUT /api/templates/[id]
  *
  * Update an existing template.
  *
@@ -78,22 +78,22 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ name: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { name } = await params;
+    const { id } = await params;
     const body = await request.json();
     const { description, content } = body;
 
     // Check if template exists
     const existing = await prisma.template.findUnique({
-      where: { name },
-      select: { type: true },
+      where: { id },
+      select: { type: true, name: true },
     });
 
     if (!existing) {
       return NextResponse.json(
-        { error: `模板不存在: ${name}` },
+        { error: `模板不存在: ${id}` },
         { status: 404 }
       );
     }
@@ -124,7 +124,7 @@ export async function PUT(
 
     // Update template
     const updated = await prisma.template.update({
-      where: { name },
+      where: { id },
       data: updateData,
       select: {
         id: true,
@@ -132,6 +132,7 @@ export async function PUT(
         description: true,
         type: true,
         category: true,
+        content: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -142,7 +143,7 @@ export async function PUT(
       template: updated,
     });
   } catch (error) {
-    console.error(`[PUT /api/templates/${(await params).name}] Error:`, error);
+    console.error(`[PUT /api/templates/${(await params).id}] Error:`, error);
 
     return NextResponse.json(
       {
@@ -155,7 +156,7 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/templates/[name]
+ * DELETE /api/templates/[id]
  *
  * Delete a template.
  *
@@ -163,20 +164,20 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ name: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { name } = await params;
+    const { id } = await params;
 
     // Check if template exists
     const existing = await prisma.template.findUnique({
-      where: { name },
-      select: { type: true },
+      where: { id },
+      select: { type: true, name: true },
     });
 
     if (!existing) {
       return NextResponse.json(
-        { error: `模板不存在: ${name}` },
+        { error: `模板不存在: ${id}` },
         { status: 404 }
       );
     }
@@ -191,15 +192,15 @@ export async function DELETE(
 
     // Delete template
     await prisma.template.delete({
-      where: { name },
+      where: { id },
     });
 
     return NextResponse.json({
       success: true,
-      message: `模板已删除: ${name}`,
+      message: `模板已删除: ${existing.name}`,
     });
   } catch (error) {
-    console.error(`[DELETE /api/templates/${(await params).name}] Error:`, error);
+    console.error(`[DELETE /api/templates/${(await params).id}] Error:`, error);
 
     return NextResponse.json(
       {

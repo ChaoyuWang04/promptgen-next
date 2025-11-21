@@ -82,6 +82,7 @@ export default function TemplatesPage() {
 
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [editorContent, setEditorContent] = useState('');
+  const [originalContent, setOriginalContent] = useState('');
   const [previewSelections, setPreviewSelections] = useState<Record<string, string>>({});
   const [previewResult, setPreviewResult] = useState<string | null>(null);
 
@@ -89,25 +90,87 @@ export default function TemplatesPage() {
   const [showSaveAsDialog, setShowSaveAsDialog] = useState(false);
   const [showNewTemplateDialog, setShowNewTemplateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
   // Form states for dialogs
   const [newTemplateName, setNewTemplateName] = useState('');
-  const [newTemplateType, setNewTemplateType] = useState<'main' | 'diff'>('main');
+  const [newTemplateCategory, setNewTemplateCategory] = useState<'MAIN' | 'DIFF'>('MAIN');
   const [newTemplateDescription, setNewTemplateDescription] = useState('');
 
   // Get currently selected template object
   const currentTemplate = templates?.find((t) => t.id === selectedTemplate);
-  const isSystemTemplate = currentTemplate?.category === 'system';
+  const isSystemTemplate = currentTemplate?.type === 'SYSTEM';
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = editorContent !== originalContent && selectedTemplate !== null;
 
   // Load template content when selection changes
   useEffect(() => {
     if (selectedTemplate && templates) {
       const template = templates.find((t) => t.id === selectedTemplate);
-      if (template) {
+      if (template && template.content !== undefined) {
         setEditorContent(template.content);
+        setOriginalContent(template.content);
       }
     }
   }, [selectedTemplate, templates]);
+
+  // Add beforeunload event listener to warn about unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle template selection with unsaved changes check
+  const handleTemplateChange = (newTemplateId: string) => {
+    if (hasUnsavedChanges) {
+      setPendingTemplateId(newTemplateId);
+      setShowUnsavedChangesDialog(true);
+    } else {
+      setSelectedTemplate(newTemplateId);
+    }
+  };
+
+  // Handle unsaved changes dialog actions
+  const handleSaveAndSwitch = async () => {
+    if (selectedTemplate) {
+      try {
+        await updateMutation.mutateAsync({
+          id: selectedTemplate,
+          content: editorContent,
+        });
+        setOriginalContent(editorContent);
+        if (pendingTemplateId) {
+          setSelectedTemplate(pendingTemplateId);
+          setPendingTemplateId(null);
+        }
+        setShowUnsavedChangesDialog(false);
+      } catch (error) {
+        // Error handled by mutation
+      }
+    }
+  };
+
+  const handleDiscardAndSwitch = () => {
+    if (pendingTemplateId) {
+      setSelectedTemplate(pendingTemplateId);
+      setPendingTemplateId(null);
+    }
+    setShowUnsavedChangesDialog(false);
+  };
+
+  const handleCancelSwitch = () => {
+    setPendingTemplateId(null);
+    setShowUnsavedChangesDialog(false);
+  };
 
   // Handle save template
   const handleSave = async () => {
@@ -120,7 +183,7 @@ export default function TemplatesPage() {
       return;
     }
 
-    if (currentTemplate?.category === 'system') {
+    if (currentTemplate?.type === 'SYSTEM') {
       toast({
         title: '无法保存',
         description: '系统模板不可修改，请使用"另存为"创建新模板',
@@ -134,6 +197,7 @@ export default function TemplatesPage() {
         id: selectedTemplate,
         content: editorContent,
       });
+      setOriginalContent(editorContent);
     } catch (error) {
       // Error toast handled by mutation
     }
@@ -154,18 +218,19 @@ export default function TemplatesPage() {
       const newTemplate = await createMutation.mutateAsync({
         name: newTemplateName,
         type: 'USER', // User-created templates are always USER type
-        category: newTemplateType.toUpperCase() as 'MAIN' | 'DIFF', // 'main' -> 'MAIN' or 'diff' -> 'DIFF'
+        category: newTemplateCategory,
         content: editorContent,
         description: newTemplateDescription || undefined,
       });
 
       // Select the newly created template
       setSelectedTemplate(newTemplate.id);
+      setOriginalContent(editorContent);
       setShowSaveAsDialog(false);
 
       // Reset form
       setNewTemplateName('');
-      setNewTemplateType('main');
+      setNewTemplateCategory('MAIN');
       setNewTemplateDescription('');
     } catch (error) {
       // Error toast handled by mutation
@@ -187,7 +252,7 @@ export default function TemplatesPage() {
       const newTemplate = await createMutation.mutateAsync({
         name: newTemplateName,
         type: 'USER', // User-created templates are always USER type
-        category: newTemplateType.toUpperCase() as 'MAIN' | 'DIFF', // 'main' -> 'MAIN' or 'diff' -> 'DIFF'
+        category: newTemplateCategory,
         content: '', // Empty content for new template
         description: newTemplateDescription || undefined,
       });
@@ -195,10 +260,11 @@ export default function TemplatesPage() {
       // Select the newly created template and set default template content as guide
       setSelectedTemplate(newTemplate.id);
       const defaultContent =
-        newTemplateType === 'main'
+        newTemplateCategory === 'MAIN'
           ? '// 在此处编写主模板内容\n// 使用 {{@module:variable}} 引用预定义模块\n// 使用 {{library.field}} 直接访问库字段\n\n角色: {{@character:name}}\n姿势: {{@pose:description}}\n场景: {{@scene:description}}\n'
           : '// 在此处编写差分模板内容\n// 使用 {{main.variable}} 引用主提示词变量\n// 使用 {{new_variable}} 引用新状态变量\n\n基于主提示词修改:\n{{main.character}}\n新增装饰: {{new_decorations.items}}\n';
       setEditorContent(defaultContent);
+      setOriginalContent(defaultContent);
       setShowNewTemplateDialog(false);
 
       // Show success toast with guidance
@@ -209,7 +275,7 @@ export default function TemplatesPage() {
 
       // Reset form
       setNewTemplateName('');
-      setNewTemplateType('main');
+      setNewTemplateCategory('MAIN');
       setNewTemplateDescription('');
     } catch (error) {
       // Error toast handled by mutation
@@ -220,7 +286,7 @@ export default function TemplatesPage() {
   const handleDelete = async () => {
     if (!selectedTemplate) return;
 
-    if (currentTemplate?.category === 'system') {
+    if (currentTemplate?.type === 'SYSTEM') {
       toast({
         title: '无法删除',
         description: '系统模板不可删除',
@@ -233,6 +299,7 @@ export default function TemplatesPage() {
       await deleteMutation.mutateAsync(selectedTemplate);
       setSelectedTemplate(null);
       setEditorContent('');
+      setOriginalContent('');
       setShowDeleteDialog(false);
     } catch (error) {
       // Error toast handled by mutation
@@ -259,7 +326,7 @@ export default function TemplatesPage() {
       const result = await previewMutation.mutateAsync({
         template_content: editorContent,
         library_ids: previewSelections,
-        type: currentTemplate?.type || 'main',
+        type: currentTemplate?.category || 'MAIN',
       });
 
       setPreviewResult(result.prompt_cn);
@@ -376,7 +443,7 @@ export default function TemplatesPage() {
                 <Label>选择模板</Label>
                 <Select
                   value={selectedTemplate || ''}
-                  onValueChange={(value) => setSelectedTemplate(value)}
+                  onValueChange={handleTemplateChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="选择一个模板进行编辑" />
@@ -386,17 +453,17 @@ export default function TemplatesPage() {
                       <SelectItem key={template.id} value={template.id}>
                         <div className="flex items-center gap-2">
                           {template.name}
-                          <Badge variant={template.category === 'system' ? 'default' : 'secondary'}>
-                            {template.category}
+                          <Badge variant={template.type === 'SYSTEM' ? 'default' : 'secondary'}>
+                            {template.type}
                           </Badge>
-                          <Badge variant="outline">{template.type}</Badge>
+                          <Badge variant="outline">{template.category}</Badge>
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              {selectedTemplate && currentTemplate?.category === 'user' && (
+              {selectedTemplate && currentTemplate?.type === 'USER' && (
                 <div className="flex items-end">
                   <Button
                     variant="outline"
@@ -436,7 +503,7 @@ export default function TemplatesPage() {
                 onClick={handleSave}
                 disabled={
                   !selectedTemplate ||
-                  currentTemplate?.category === 'system' ||
+                  currentTemplate?.type === 'SYSTEM' ||
                   updateMutation.isPending
                 }
               >
@@ -545,13 +612,13 @@ export default function TemplatesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="save-as-type">模板类型 *</Label>
-              <Select value={newTemplateType} onValueChange={(v: 'main' | 'diff') => setNewTemplateType(v)}>
+              <Select value={newTemplateCategory} onValueChange={(v: 'MAIN' | 'DIFF') => setNewTemplateCategory(v)}>
                 <SelectTrigger id="save-as-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="main">MAIN（主模板）</SelectItem>
-                  <SelectItem value="diff">DIFF（差异模板）</SelectItem>
+                  <SelectItem value="MAIN">MAIN（主模板）</SelectItem>
+                  <SelectItem value="DIFF">DIFF（差异模板）</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -603,13 +670,13 @@ export default function TemplatesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-type">模板类型 *</Label>
-              <Select value={newTemplateType} onValueChange={(v: 'main' | 'diff') => setNewTemplateType(v)}>
+              <Select value={newTemplateCategory} onValueChange={(v: 'MAIN' | 'DIFF') => setNewTemplateCategory(v)}>
                 <SelectTrigger id="new-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="main">MAIN（主模板）</SelectItem>
-                  <SelectItem value="diff">DIFF（差异模板）</SelectItem>
+                  <SelectItem value="MAIN">MAIN（主模板）</SelectItem>
+                  <SelectItem value="DIFF">DIFF（差异模板）</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -655,6 +722,30 @@ export default function TemplatesPage() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? '删除中...' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved Changes Warning Dialog */}
+      <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>有未保存的更改</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前模板有未保存的更改。是否要保存更改后再切换模板？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelSwitch}>取消</AlertDialogCancel>
+            <Button variant="outline" onClick={handleDiscardAndSwitch}>
+              不保存
+            </Button>
+            <AlertDialogAction
+              onClick={handleSaveAndSwitch}
+              disabled={updateMutation.isPending || currentTemplate?.type === 'SYSTEM'}
+            >
+              {updateMutation.isPending ? '保存中...' : '保存并切换'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

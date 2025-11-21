@@ -1,0 +1,285 @@
+/**
+ * Variant Generation API
+ * POST /api/combinations/[id]/generate - Generate a new variant for a combination
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db/prisma';
+import {
+  ensureCombinationDirectory,
+  getVariantPaths,
+  getNextVariantNumber,
+} from '@/lib/utils/file-manager';
+import { generateImageId } from '@/lib/utils/image-id';
+import fs from 'fs/promises';
+import path from 'path';
+
+// Import providers and stitcher
+import { ProviderManager } from '@/lib/providers';
+import { ImageStitcher } from '@/lib/stitcher/image-stitcher';
+import { generateMainPrompt } from '@/lib/generators/main-prompt-generator';
+import { generateDiffPrompt } from '@/lib/generators/diff-prompt-generator';
+
+interface RouteParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+/**
+ * POST /api/combinations/[id]/generate
+ * Generate a new variant for a combination
+ *
+ * This creates:
+ * - Main image (v{n}_main.png)
+ * - Diff image (v{n}_diff.png)
+ * - Final image in English (v{n}_final_en.png)
+ *
+ * Other language versions can be generated on demand
+ */
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+
+    // Find the combination
+    const combination = await prisma.combination.findUnique({
+      where: { id },
+      include: {
+        records: {
+          orderBy: { variantNumber: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!combination) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `Combination not found: ${id}`,
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    const startTime = Date.now();
+    const libraryIds = combination.libraryIds as Record<string, string>;
+
+    // Determine next variant number
+    const nextVariantNumber =
+      combination.records.length > 0
+        ? combination.records[0].variantNumber + 1
+        : 1;
+
+    // Generate unique image ID for this variant
+    const imageId = await generateImageId(libraryIds as any);
+
+    // Create the record in database
+    const record = await prisma.record.create({
+      data: {
+        imageId,
+        combinationId: combination.id,
+        variantNumber: nextVariantNumber,
+        libraryIds,
+        outfitMinorState: [],
+        usedDecorations: { from_theme: [], from_scene: [] },
+        providerAttempts: [],
+      },
+    });
+
+    try {
+      // Step 1: Generate prompts
+      console.log(`[Variant Generation] Generating prompts for ${imageId}...`);
+
+      const mainPromptResult = await generateMainPrompt(libraryIds as any);
+      const diffPromptResult = await generateDiffPrompt(
+        imageId,
+        libraryIds as any
+      );
+
+      // Save prompts to database
+      await prisma.prompt.createMany({
+        data: [
+          {
+            recordId: record.id,
+            type: 'MAIN',
+            promptCn: mainPromptResult.prompt_cn || '',
+            promptEn: mainPromptResult.prompt_en || '',
+          },
+          {
+            recordId: record.id,
+            type: 'DIFF',
+            promptCn: diffPromptResult.prompt_cn || '',
+            promptEn: diffPromptResult.prompt_en || '',
+          },
+        ],
+      });
+
+      // Update outfit state from prompt generation
+      await prisma.record.update({
+        where: { id: record.id },
+        data: {
+          outfitMinorState: mainPromptResult.outfit_minor_state || [],
+          usedDecorations: mainPromptResult.used_decorations || {
+            from_theme: [],
+            from_scene: [],
+          },
+          promptGenerated: true,
+        },
+      });
+
+      // Step 2: Generate images
+      console.log(`[Variant Generation] Generating images for ${imageId}...`);
+
+      // Ensure directory exists
+      const directory = await ensureCombinationDirectory(
+        combination.combinationKey
+      );
+
+      const paths = getVariantPaths(
+        combination.combinationKey,
+        nextVariantNumber,
+        ['en']
+      );
+
+      // Initialize provider manager and stitcher
+      const providerConfig = {
+        providers: process.env.IMAGE_PROVIDERS || 'gemini',
+        gemini: process.env.GEMINI_API_KEY
+          ? {
+              apiKey: process.env.GEMINI_API_KEY,
+              model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-image',
+            }
+          : undefined,
+        bytedance: process.env.BYTEDANCE_API_KEY
+          ? {
+              apiKey: process.env.BYTEDANCE_API_KEY,
+              model:
+                process.env.BYTEDANCE_MODEL || 'doubao-seedream-4-0-250828',
+            }
+          : undefined,
+      };
+      const providerManager = new ProviderManager(providerConfig);
+      const stitcher = new ImageStitcher();
+
+      // Round 1: Generate main image
+      console.log(`[Variant Generation] Round 1: Main image...`);
+      const mainResult = await providerManager.generateWithFallback(
+        mainPromptResult.prompt_en || ''
+      );
+
+      await fs.writeFile(paths.mainImage, mainResult.image);
+
+      // Round 2: Generate diff image with same provider
+      console.log(
+        `[Variant Generation] Round 2: Diff image with ${mainResult.provider}...`
+      );
+      const diffImage = await providerManager.generateWithProvider(
+        mainResult.provider,
+        diffPromptResult.prompt_en || '',
+        mainResult.image
+      );
+
+      await fs.writeFile(paths.diffImage, diffImage);
+
+      // Round 3: Stitch final image (English only)
+      console.log(`[Variant Generation] Round 3: Stitching final image...`);
+      const finalPath = path.join(
+        directory,
+        `v${nextVariantNumber}_final_en.png`
+      );
+
+      await stitcher.stitch({
+        mainImagePath: paths.mainImage,
+        diffImagePath: paths.diffImage,
+        outputPath: finalPath,
+        languageId: 1, // English
+      });
+
+      // Create image variant record
+      const imageVariant = await prisma.imageVariant.create({
+        data: {
+          recordId: record.id,
+          version: nextVariantNumber,
+          imageMainPath: paths.mainImage,
+          imageDiffPath: paths.diffImage,
+          finalImages: {
+            en: `/images/combinations/${combination.combinationKey}/v${nextVariantNumber}_final_en.png`,
+          },
+        },
+      });
+
+      // Update record as image generated
+      await prisma.record.update({
+        where: { id: record.id },
+        data: {
+          imageGenerated: true,
+          providerUsed: mainResult.provider,
+          providerAttempts: [
+            {
+              provider: mainResult.provider,
+              success: true,
+              attemptedAt: new Date().toISOString(),
+              round: 'main',
+            },
+            {
+              provider: mainResult.provider,
+              success: true,
+              attemptedAt: new Date().toISOString(),
+              round: 'diff',
+            },
+          ],
+        },
+      });
+
+      const totalTimeMs = Date.now() - startTime;
+      console.log(
+        `[Variant Generation] Complete for ${imageId} (${totalTimeMs}ms)`
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          record: {
+            id: record.id,
+            imageId,
+            variantNumber: nextVariantNumber,
+          },
+          variant: imageVariant,
+          provider: mainResult.provider,
+          totalTimeMs,
+        },
+        message: `Variant v${nextVariantNumber} generated successfully`,
+      });
+    } catch (error) {
+      // Clean up on failure
+      console.error(`[Variant Generation] Failed for ${imageId}:`, error);
+
+      // Delete the record if image generation failed
+      await prisma.record.delete({
+        where: { id: record.id },
+      });
+
+      throw error;
+    }
+  } catch (error) {
+    console.error(
+      `[API] POST /api/combinations/${(await params).id}/generate error:`,
+      error
+    );
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to generate variant',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
