@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
+import { CreateTemplateSchema } from '@/schemas/template.schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,50 +88,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, type, category, content } = body;
 
-    // Validate required fields
-    if (!name || !type || !category || !content) {
+    // Validate request body using Zod schema
+    const validationResult = CreateTemplateSchema.safeParse(body);
+
+    if (!validationResult.success) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: '缺少必需字段',
-            details: { required: ['name', 'type', 'category', 'content'] },
+            message: '输入数据验证失败',
+            details: validationResult.error.flatten(),
           },
         },
         { status: 400 }
       );
     }
 
-    // Validate type
-    if (!['SYSTEM', 'USER'].includes(type.toUpperCase())) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid type. Must be SYSTEM or USER',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate category
-    if (!['MAIN', 'DIFF'].includes(category.toUpperCase())) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid category. Must be MAIN or DIFF',
-          },
-        },
-        { status: 400 }
-      );
-    }
+    const { name, description, type, category, content } = validationResult.data;
 
     // Check if template name already exists
     const existing = await prisma.template.findUnique({
@@ -155,8 +131,8 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         description: description || null,
-        type: type.toUpperCase(),
-        category: category.toUpperCase(),
+        type, // Already validated by Zod as TemplateType enum
+        category, // Already validated by Zod as TemplateCategory enum
         content,
       },
       select: {

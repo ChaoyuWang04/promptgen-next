@@ -153,8 +153,8 @@ export default function TemplatesPage() {
     try {
       const newTemplate = await createMutation.mutateAsync({
         name: newTemplateName,
-        type: newTemplateType,
-        category: 'user',
+        type: 'USER', // User-created templates are always USER type
+        category: newTemplateType.toUpperCase() as 'MAIN' | 'DIFF', // 'main' -> 'MAIN' or 'diff' -> 'DIFF'
         content: editorContent,
         description: newTemplateDescription || undefined,
       });
@@ -186,16 +186,26 @@ export default function TemplatesPage() {
     try {
       const newTemplate = await createMutation.mutateAsync({
         name: newTemplateName,
-        type: newTemplateType,
-        category: 'user',
+        type: 'USER', // User-created templates are always USER type
+        category: newTemplateType.toUpperCase() as 'MAIN' | 'DIFF', // 'main' -> 'MAIN' or 'diff' -> 'DIFF'
         content: '', // Empty content for new template
         description: newTemplateDescription || undefined,
       });
 
-      // Select the newly created template
+      // Select the newly created template and set default template content as guide
       setSelectedTemplate(newTemplate.id);
-      setEditorContent('');
+      const defaultContent =
+        newTemplateType === 'main'
+          ? '// 在此处编写主模板内容\n// 使用 {{@module:variable}} 引用预定义模块\n// 使用 {{library.field}} 直接访问库字段\n\n角色: {{@character:name}}\n姿势: {{@pose:description}}\n场景: {{@scene:description}}\n'
+          : '// 在此处编写差分模板内容\n// 使用 {{main.variable}} 引用主提示词变量\n// 使用 {{new_variable}} 引用新状态变量\n\n基于主提示词修改:\n{{main.character}}\n新增装饰: {{new_decorations.items}}\n';
+      setEditorContent(defaultContent);
       setShowNewTemplateDialog(false);
+
+      // Show success toast with guidance
+      toast({
+        title: '模板创建成功',
+        description: '现在可以在编辑器中编写模板内容，完成后记得保存',
+      });
 
       // Reset form
       setNewTemplateName('');

@@ -8,8 +8,13 @@ import { z } from 'zod';
 // ========================================
 // Template Enums
 // ========================================
-export const TemplateTypeSchema = z.enum(['SYSTEM', 'USER']);
-export const TemplateCategorySchema = z.enum(['MAIN', 'DIFF']);
+export const TemplateTypeSchema = z
+  .enum(['SYSTEM', 'USER', 'system', 'user'])
+  .transform((val) => val.toUpperCase() as 'SYSTEM' | 'USER');
+
+export const TemplateCategorySchema = z
+  .enum(['MAIN', 'DIFF', 'main', 'diff'])
+  .transform((val) => val.toUpperCase() as 'MAIN' | 'DIFF');
 
 // ========================================
 // Template Schema
@@ -20,7 +25,7 @@ export const TemplateSchema = z.object({
   description: z.string().nullable().optional(),
   type: TemplateTypeSchema,
   category: TemplateCategorySchema,
-  content: z.string().min(1, 'Template content is required'),
+  content: z.string(), // Allow empty content for new templates
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
 });
