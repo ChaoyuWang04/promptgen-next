@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/db/prisma';
 import { generateImageId } from '@/lib/utils/image-id';
+import type { LibraryName } from '@/lib/config/library-config';
 
 /**
  * Library filter for combination enumeration
@@ -291,5 +292,174 @@ export class ComboManager {
       withoutPrompts: totalPossible - withPrompts,
       withPromptsButNoImages: withPrompts - withImages,
     };
+  }
+
+  /**
+   * ============================================================
+   * NEW: Dynamic Library Strategy Support (Multi-Select)
+   * ============================================================
+   */
+
+  /**
+   * Calculate combination count with dynamic libraries and multi-select
+   *
+   * @param strategyConfig - Library selections (each library can have multiple element IDs)
+   * @returns Total combination count
+   *
+   * @example
+   * // 2 characters × 1 theme × 3 scenes = 6 combinations
+   * calculateDynamicCombinationCount({
+   *   character: ['betty', 'alice'],
+   *   theme: ['christmas'],
+   *   scene: [] // empty means all scenes
+   * })
+   */
+  async calculateDynamicCombinationCount(
+    strategyConfig: Partial<Record<LibraryName, string[]>>
+  ): Promise<number> {
+    const libraries = await this.loadDynamicLibraries(
+      Object.keys(strategyConfig) as LibraryName[]
+    );
+
+    let total = 1;
+
+    for (const [libraryName, selectedIds] of Object.entries(strategyConfig)) {
+      const libraryEntries = libraries[libraryName] || [];
+
+      // If selectedIds is empty or undefined, use all entries
+      const count =
+        selectedIds && selectedIds.length > 0
+          ? selectedIds.length
+          : libraryEntries.length;
+
+      total *= count;
+    }
+
+    console.log(
+      `[ComboManager] Dynamic combination count: ${total}`,
+      strategyConfig
+    );
+
+    return total;
+  }
+
+  /**
+   * Enumerate combinations with dynamic libraries
+   *
+   * @param strategyConfig - Library selections
+   * @returns Array of image IDs for each combination
+   *
+   * @example
+   * enumerateDynamicCombinations({
+   *   character: ['betty'],
+   *   theme: ['christmas', 'halloween'],
+   *   scene: ['bedroom']
+   * })
+   * // Returns: ['betty_christmas_bedroom', 'betty_halloween_bedroom']
+   */
+  async enumerateDynamicCombinations(
+    strategyConfig: Partial<Record<LibraryName, string[]>>
+  ): Promise<Array<{ imageId: string; libraryIds: Record<string, string> }>> {
+    console.log('[ComboManager] Enumerating dynamic combinations:', strategyConfig);
+
+    const libraryNames = Object.keys(strategyConfig) as LibraryName[];
+    const libraries = await this.loadDynamicLibraries(libraryNames);
+
+    // Prepare selected entries for each library
+    const selectedEntriesMap: Record<string, Array<{ id: string }>> = {};
+
+    for (const libraryName of libraryNames) {
+      const allEntries = libraries[libraryName] || [];
+      const selectedIds = strategyConfig[libraryName] || [];
+
+      selectedEntriesMap[libraryName] =
+        selectedIds.length > 0
+          ? allEntries.filter((entry) => selectedIds.includes(entry.id))
+          : allEntries;
+    }
+
+    // Generate Cartesian product
+    const combinations = this.generateCartesianProduct(
+      libraryNames,
+      selectedEntriesMap
+    );
+
+    console.log(
+      `[ComboManager] Generated ${combinations.length} dynamic combination(s)`
+    );
+
+    return combinations;
+  }
+
+  /**
+   * Load library entries for specific library names
+   */
+  private async loadDynamicLibraries(libraryNames: LibraryName[]) {
+    const libraries = await prisma.library.findMany({
+      where: {
+        name: {
+          in: libraryNames,
+        },
+      },
+    });
+
+    const libraryMap: Record<string, Array<{ id: string; [key: string]: any }>> = {};
+
+    for (const library of libraries) {
+      const entries = library.entries as Record<string, any>;
+      libraryMap[library.name] = Object.entries(entries).map(([id, data]) => ({
+        id,
+        ...data,
+      }));
+    }
+
+    return libraryMap;
+  }
+
+  /**
+   * Generate Cartesian product for dynamic library combinations
+   */
+  private generateCartesianProduct(
+    libraryNames: LibraryName[],
+    entriesMap: Record<string, Array<{ id: string }>>
+  ): Array<{ imageId: string; libraryIds: Record<string, string> }> {
+    const results: Array<{ imageId: string; libraryIds: Record<string, string> }> =
+      [];
+
+    const generate = (index: number, current: Record<string, string>) => {
+      if (index === libraryNames.length) {
+        // Base case: all libraries selected, generate imageId
+        const imageId = this.generateImageIdSync(current);
+        results.push({
+          imageId,
+          libraryIds: { ...current },
+        });
+        return;
+      }
+
+      const libraryName = libraryNames[index];
+      const entries = entriesMap[libraryName] || [];
+
+      for (const entry of entries) {
+        generate(index + 1, {
+          ...current,
+          [libraryName]: entry.id,
+        });
+      }
+    };
+
+    generate(0, {});
+    return results;
+  }
+
+  /**
+   * Synchronous version of generateImageId for Cartesian product
+   * Uses deterministic ID generation without database lookup
+   */
+  private generateImageIdSync(libraryIds: Record<string, string>): string {
+    // Sort keys to ensure consistent order
+    const sortedKeys = Object.keys(libraryIds).sort();
+    const parts = sortedKeys.map((key) => libraryIds[key]);
+    return parts.join('_');
   }
 }
