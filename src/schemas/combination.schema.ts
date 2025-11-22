@@ -38,6 +38,9 @@ export const CreateCombinationSchema = CombinationSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  // combinationKey is optional for create - will be auto-generated from entry names
+  combinationKey: z.string().optional(),
 });
 
 export const UpdateCombinationSchema = CombinationSchema.partial().omit({

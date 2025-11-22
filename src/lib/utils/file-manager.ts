@@ -56,20 +56,30 @@ function extractShortName(entryId: string, libraryName: string): string {
  * in a consistent order for reproducibility.
  *
  * @param libraryIds - Map of library name to entry ID
- * @param libraryOrder - Optional order of libraries (default: alphabetical)
+ * @param options - Optional configuration
+ * @param options.libraryOrder - Order of libraries (default: character, pose, scene, theme, style)
+ * @param options.libraryNames - Map of library name to entry name (if provided, uses names directly)
  * @returns Combination key string
  *
- * Example:
- * libraryIds = { character: "char_betty_v1", theme: "theme_christmas_v1", scene: "scene_entrance_door_v1" }
- * Returns: "betty_christmas_entrance"
+ * Example with names:
+ * libraryNames = { character: "betty", theme: "christmas", scene: "entrance" }
+ * Returns: "betty_entrance_christmas"
+ *
+ * Example with IDs (legacy):
+ * libraryIds = { character: "char_betty_v1", theme: "theme_christmas_v1" }
+ * Returns: "betty_christmas" (extracted from IDs)
  */
 export function generateCombinationKey(
   libraryIds: Record<string, string>,
-  libraryOrder?: string[]
+  options?: {
+    libraryOrder?: string[];
+    libraryNames?: Record<string, string>;
+  }
 ): string {
   // Default order: character, pose, scene, theme, style, then any others alphabetically
   const defaultOrder = ['character', 'pose', 'scene', 'theme', 'style'];
-  const order = libraryOrder || defaultOrder;
+  const order = options?.libraryOrder || defaultOrder;
+  const libraryNames = options?.libraryNames;
 
   const parts: string[] = [];
 
@@ -77,7 +87,9 @@ export function generateCombinationKey(
   for (const library of order) {
     const entryId = libraryIds[library];
     if (entryId) {
-      parts.push(extractShortName(entryId, library));
+      // Use provided name if available, otherwise extract from ID
+      const name = libraryNames?.[library] || extractShortName(entryId, library);
+      parts.push(name);
     }
   }
 
@@ -89,7 +101,8 @@ export function generateCombinationKey(
   for (const library of remainingLibraries) {
     const entryId = libraryIds[library];
     if (entryId) {
-      parts.push(extractShortName(entryId, library));
+      const name = libraryNames?.[library] || extractShortName(entryId, library);
+      parts.push(name);
     }
   }
 

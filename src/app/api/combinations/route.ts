@@ -153,7 +153,25 @@ export async function POST(request: NextRequest) {
     // Generate combination key if not provided
     let combinationKey = validationResult.data.combinationKey;
     if (!combinationKey) {
-      combinationKey = generateCombinationKey(libraryIds);
+      // Fetch library entries to get entry names for the combination key
+      const libraryNamesArray = Object.keys(libraryIds);
+      const libraries = await prisma.library.findMany({
+        where: { name: { in: libraryNamesArray } },
+        select: { name: true, entries: true },
+      });
+
+      // Build libraryNames map from entries
+      const libraryNames: Record<string, string> = {};
+      for (const library of libraries) {
+        const entryId = libraryIds[library.name];
+        const entries = library.entries as Record<string, any>;
+        const entry = entries[entryId];
+        if (entry?.name) {
+          libraryNames[library.name] = entry.name;
+        }
+      }
+
+      combinationKey = generateCombinationKey(libraryIds, { libraryNames });
     }
 
     // Check if combination already exists

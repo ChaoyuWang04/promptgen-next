@@ -365,17 +365,22 @@ export class ComboManager {
     const libraryNames = Object.keys(strategyConfig) as LibraryName[];
     const libraries = await this.loadDynamicLibraries(libraryNames);
 
-    // Prepare selected entries for each library
-    const selectedEntriesMap: Record<string, Array<{ id: string }>> = {};
+    // Prepare selected entries for each library (include both id and name)
+    const selectedEntriesMap: Record<string, Array<{ id: string; name: string }>> = {};
 
     for (const libraryName of libraryNames) {
       const allEntries = libraries[libraryName] || [];
       const selectedIds = strategyConfig[libraryName] || [];
 
-      selectedEntriesMap[libraryName] =
-        selectedIds.length > 0
-          ? allEntries.filter((entry) => selectedIds.includes(entry.id))
-          : allEntries;
+      const filteredEntries = selectedIds.length > 0
+        ? allEntries.filter((entry) => selectedIds.includes(entry.id))
+        : allEntries;
+
+      // Map entries to include both id and name
+      selectedEntriesMap[libraryName] = filteredEntries.map((entry) => ({
+        id: entry.id,
+        name: entry.name || entry.id, // Fallback to id if name is missing
+      }));
     }
 
     // Generate Cartesian product
@@ -421,18 +426,22 @@ export class ComboManager {
    */
   private generateCartesianProduct(
     libraryNames: LibraryName[],
-    entriesMap: Record<string, Array<{ id: string }>>
+    entriesMap: Record<string, Array<{ id: string; name: string }>>
   ): Array<{ imageId: string; libraryIds: Record<string, string> }> {
     const results: Array<{ imageId: string; libraryIds: Record<string, string> }> =
       [];
 
-    const generate = (index: number, current: Record<string, string>) => {
+    const generate = (
+      index: number,
+      currentIds: Record<string, string>,
+      currentNames: Record<string, string>
+    ) => {
       if (index === libraryNames.length) {
-        // Base case: all libraries selected, generate imageId
-        const imageId = this.generateImageIdSync(current);
+        // Base case: all libraries selected, generate imageId using names
+        const imageId = this.generateImageIdSync(currentNames);
         results.push({
           imageId,
-          libraryIds: { ...current },
+          libraryIds: { ...currentIds },
         });
         return;
       }
@@ -441,25 +450,26 @@ export class ComboManager {
       const entries = entriesMap[libraryName] || [];
 
       for (const entry of entries) {
-        generate(index + 1, {
-          ...current,
-          [libraryName]: entry.id,
-        });
+        generate(
+          index + 1,
+          { ...currentIds, [libraryName]: entry.id },
+          { ...currentNames, [libraryName]: entry.name }
+        );
       }
     };
 
-    generate(0, {});
+    generate(0, {}, {});
     return results;
   }
 
   /**
    * Synchronous version of generateImageId for Cartesian product
-   * Uses deterministic ID generation without database lookup
+   * Uses entry names to generate a human-readable combination key
    */
-  private generateImageIdSync(libraryIds: Record<string, string>): string {
+  private generateImageIdSync(libraryNames: Record<string, string>): string {
     // Sort keys to ensure consistent order
-    const sortedKeys = Object.keys(libraryIds).sort();
-    const parts = sortedKeys.map((key) => libraryIds[key]);
+    const sortedKeys = Object.keys(libraryNames).sort();
+    const parts = sortedKeys.map((key) => libraryNames[key]);
     return parts.join('_');
   }
 }
