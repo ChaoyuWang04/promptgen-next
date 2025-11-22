@@ -195,3 +195,58 @@ export function useDeleteTemplate() {
     },
   });
 }
+
+/**
+ * ============================================================
+ * NEW: Strategy Generation Support Hooks
+ * ============================================================
+ */
+
+export interface TemplateLibrary {
+  name: string;
+  displayName: string;
+  exists: boolean;
+  entryCount: number;
+  isActive: boolean;
+  config?: {
+    type: 'required' | 'optional';
+    displayField: string;
+    structureType: 'standard' | 'nested_array';
+  };
+}
+
+export interface TemplateLibrariesResponse {
+  templateId: string;
+  templateName: string;
+  templateCategory: 'MAIN' | 'DIFF';
+  templateType: 'SYSTEM' | 'USER';
+  libraries: TemplateLibrary[];
+  totalLibraries: number;
+}
+
+/**
+ * Hook to fetch libraries referenced in a template
+ *
+ * @param templateId - Template ID
+ * @returns Query result with template libraries metadata
+ *
+ * @example
+ * const { data } = useTemplateLibraries('template_main_v1');
+ * // data.libraries: [{ name: 'character', displayName: '人物', entryCount: 3, ... }]
+ */
+export function useTemplateLibraries(templateId: string) {
+  return useQuery<TemplateLibrariesResponse>({
+    queryKey: queryKeys.templates.libraries(templateId),
+    queryFn: async () => {
+      const response = await fetch(`/api/templates/${templateId}/libraries`);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error?.message || '获取模板库引用失败');
+      }
+
+      return result.data;
+    },
+    enabled: !!templateId,
+  });
+}

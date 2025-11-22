@@ -336,3 +336,61 @@ export function useCreateCombination() {
     },
   });
 }
+
+/**
+ * ============================================================
+ * NEW: Strategy Generation v2 Hooks (Multi-Select Support)
+ * ============================================================
+ */
+
+export interface LibrarySummary {
+  library: string;
+  displayName: string;
+  selectedCount: number;
+  totalCount: number;
+  isAll: boolean;
+  selectedElements: Array<{ id: string; name: string }> | null;
+}
+
+export interface PreviewCombinationsRequest {
+  templateId: string;
+  strategyConfig: Record<string, string[]>;
+}
+
+export interface PreviewCombinationsResponse {
+  templateId: string;
+  templateName: string;
+  templateCategory: 'MAIN' | 'DIFF';
+  totalCombinations: number;
+  librarySummary: LibrarySummary[];
+  strategyConfig: Record<string, string[]>;
+}
+
+/**
+ * Hook to preview combination count without generating
+ *
+ * @example
+ * const preview = usePreviewCombinations();
+ * preview.mutate({
+ *   templateId: 'template_main_v1',
+ *   strategyConfig: {
+ *     character: ['char_betty_v1'],
+ *     theme: ['theme_christmas_v1', 'theme_halloween_v1'],
+ *     scene: [], // empty = all
+ *   }
+ * });
+ */
+export function usePreviewCombinations() {
+  return useMutation({
+    mutationFn: async (request: PreviewCombinationsRequest) => {
+      const response = await fetchApi<PreviewCombinationsResponse>(
+        `${API_BASE}/preview`,
+        {
+          method: 'POST',
+          body: JSON.stringify(request),
+        }
+      );
+      return response.data!;
+    },
+  });
+}

@@ -77,6 +77,7 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.templates.all, id] as const,
     variables: (type?: 'main' | 'diff') =>
       [...queryKeys.templates.all, 'variables', type] as const,
+    libraries: (id: string) => [...queryKeys.templates.all, id, 'libraries'] as const,
   },
 
   // Image keys
