@@ -356,6 +356,74 @@ feat(ui): 重构策略生成对话框支持多选和4步骤向导
 - [x] 多选元素交互流畅
 - [x] 预览面板信息完整
 - [x] 错误处理和验证完善
+- [x] **E2E测试通过** (Playwright MCP, 2025-11-22)
+
+## 🧪 E2E测试结果
+
+**测试日期**: 2025-11-22
+**测试工具**: Playwright MCP
+**测试状态**: ✅ 全部通过
+
+### 测试场景
+
+选择模板 `template_default_v1` (MAIN)，配置：
+- **人物**: betty (1/2)
+- **姿态**: 全选 (3个)
+- **场景**: 全选 (3个)
+- **主题**: 圣诞节, 万圣节 (2/3)
+- **画风**: 全选 (2个)
+
+**预期组合数**: 1 × 3 × 3 × 2 × 2 = **36个**
+
+### 测试步骤与结果
+
+1. **Step 1 - 选择模板** ✅
+   - 点击"策略生成"按钮，对话框打开
+   - 选择模板 `template_default_v1`
+   - API `/api/templates/[id]/libraries` 成功返回5个库元素
+
+2. **Step 2 - 配置元素** ✅
+   - 显示5个库的Checkbox Group
+   - 选中 betty (人物: 1/2)
+   - 选中 圣诞节, 万圣节 (主题: 2/3，多选功能正常)
+   - 其他库留空（全选）
+
+3. **Step 3 - 预览** ✅
+   - 预览API `/api/combinations/preview` 计算组合数
+   - 显示：**预计生成组合数 36 个** (计算正确)
+   - 库选择情况摘要：
+     - 人物: 1/2个 (betty)
+     - 姿态: 全选 (3个)
+     - 场景: 全选 (3个)
+     - 主题: 2/3个 (圣诞节, 万圣节)
+     - 画风: 全选 (2个)
+
+4. **Step 4 - 确认生成** ✅
+   - 点击"确认生成 36 个组合"
+   - API `/api/combinations/strategy` 成功创建记录
+   - Toast通知: "组合生成成功 - 创建了 36 个组合 (0 个已存在)"
+   - 对话框自动关闭
+   - 页面更新显示 "共 36 个组合"
+   - 分页显示: 1 / 2
+
+5. **数据库验证** ✅
+   - 数据库记录数: 36个
+   - combinationKey格式正确
+   - libraryIds包含正确的元素ID
+   - strategyConfig正确保存原始配置
+
+### 发现的问题与修复
+
+**问题**: Next.js 15+ `params` 必须 await
+**错误**: `Argument 'where' needs at least one of 'id' or 'name'`
+**原因**: `/api/templates/[id]/libraries` 路由未 await params
+**修复**: `const { id } = await params;`
+**提交**: `70cb664` - fix(api): Await params in template libraries endpoint
+
+### 截图
+
+生成成功后的组合列表页面保存在:
+`/Users/samwong/Desktop/1Project/promptgen-next/.playwright-mcp/strategy-generation-success.png`
 
 ## 🎨 UI截图说明
 
