@@ -51,7 +51,11 @@ export const UpdateCombinationSchema = CombinationSchema.partial().omit({
 // Strategy Generation Request Schema
 // ========================================
 
-export const StrategyGenerationRequestSchema = z.object({
+/**
+ * DEPRECATED (v1): Old strategy format
+ * Use StrategyGenerationRequestSchemaV2 for new implementations
+ */
+export const StrategyGenerationRequestSchemaV1 = z.object({
   templateId: z.string(),
   strategyConfig: z.object({
     // Fixed libraries with specific element IDs
@@ -60,6 +64,33 @@ export const StrategyGenerationRequestSchema = z.object({
     variable: z.array(z.string()), // ["theme", "scene"]
   }),
 });
+
+/**
+ * NEW (v2): Strategy format with multi-select support
+ *
+ * Format:
+ * {
+ *   templateId: "template_main_v1",
+ *   strategyConfig: {
+ *     character: ["char_betty_v1", "char_alice_v1"],  // Multi-select
+ *     theme: ["theme_christmas_v1"],                   // Single-select (as array)
+ *     scene: []                                        // Empty = all entries
+ *   }
+ * }
+ */
+export const StrategyGenerationRequestSchemaV2 = z.object({
+  templateId: z.string().min(1, '模板ID不能为空'),
+  strategyConfig: z
+    .record(z.array(z.string()))
+    .describe(
+      '库选择配置，格式：{ character: ["id1", "id2"], theme: [], scene: ["id3"] }'
+    ),
+});
+
+/**
+ * Default to v2 for new code
+ */
+export const StrategyGenerationRequestSchema = StrategyGenerationRequestSchemaV2;
 
 // ========================================
 // Variant Generation Request Schema

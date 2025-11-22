@@ -1,55 +1,78 @@
 /**
  * Strategy Generation API
  * POST /api/combinations/strategy - Generate combinations from strategy
- */
-
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db/prisma';
-import { StrategyGenerationRequestSchema } from '@/schemas/combination.schema';
-import { generateCombinationKey } from '@/lib/utils/file-manager';
-
-/**
- * POST /api/combinations/strategy
- * Generate combinations based on strategy configuration
  *
- * Strategy config example:
+ * NEW FORMAT (v2):
  * {
  *   templateId: "template_main_v1",
  *   strategyConfig: {
- *     fixed: { "character": "char_betty_v1" },
- *     variable: ["theme", "scene"]
+ *     character: ["char_betty_v1", "char_alice_v1"],  // Multi-select
+ *     theme: ["theme_christmas_v1"],                   // Single-select (as array)
+ *     scene: []                                        // Empty = all entries
  *   }
  * }
- *
- * This will generate combinations for:
- * - betty × all themes × all scenes
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/db/prisma';
+import { ComboManager } from '@/lib/generators/combo-manager';
+import {
+  extractLibrariesFromTemplate,
+  validateTemplateLibraryReferences,
+} from '@/lib/utils/template-parser';
+import type { LibraryName } from '@/lib/config/library-config';
+
+/**
+ * Request schema (v2 - multi-select support)
+ */
+const StrategyGenerationRequestSchema = z.object({
+  templateId: z.string().min(1, '模板ID不能为空'),
+  strategyConfig: z
+    .record(z.array(z.string()))
+    .describe(
+      '库选择配置，格式：{ character: ["id1", "id2"], theme: [], scene: ["id3"] }'
+    ),
+});
+
+type StrategyGenerationRequest = z.infer<typeof StrategyGenerationRequestSchema>;
+
+/**
+ * POST /api/combinations/strategy
+ * Generate all combinations and create Combination records
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
     // Validate request body
-    const validationResult = StrategyGenerationRequestSchema.safeParse(body);
-    if (!validationResult.success) {
+    const parseResult = StrategyGenerationRequestSchema.safeParse(body);
+
+    if (!parseResult.success) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'Invalid strategy configuration',
-            details: validationResult.error.flatten(),
+            message: '请求参数验证失败',
+            details: parseResult.error.errors,
           },
         },
         { status: 400 }
       );
     }
 
-    const { templateId, strategyConfig } = validationResult.data;
-    const { fixed, variable } = strategyConfig;
+    const { templateId, strategyConfig } = parseResult.data;
 
     // Validate template exists
     const template = await prisma.template.findUnique({
       where: { id: templateId },
+      select: {
+        id: true,
+        name: true,
+        content: true,
+        category: true,
+      },
     });
 
     if (!template) {
@@ -58,17 +81,60 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: `Template not found: ${templateId}`,
+            message: `模板 ${templateId} 不存在`,
           },
         },
         { status: 404 }
       );
     }
 
-    // Get all library entries for variable libraries
-    const libraryData: Record<string, any[]> = {};
+    // Extract and validate libraries from template
+    const templateLibraries = extractLibrariesFromTemplate(template.content);
 
-    for (const libraryName of variable) {
+    const validation = validateTemplateLibraryReferences(
+      template.content,
+      template.category
+    );
+
+    if (!validation.isValid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: validation.error,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate that strategyConfig keys match template libraries
+    const strategyLibraries = Object.keys(strategyConfig) as LibraryName[];
+    const missingLibraries = templateLibraries.filter(
+      (lib) => !strategyLibraries.includes(lib)
+    );
+
+    if (missingLibraries.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `策略配置缺少模板引用的库：${missingLibraries.join(', ')}`,
+            details: {
+              templateLibraries,
+              strategyLibraries,
+              missingLibraries,
+            },
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate that all libraries exist
+    for (const libraryName of strategyLibraries) {
       const library = await prisma.library.findUnique({
         where: { name: libraryName },
       });
@@ -79,141 +145,70 @@ export async function POST(request: NextRequest) {
             success: false,
             error: {
               code: 'NOT_FOUND',
-              message: `Library not found: ${libraryName}`,
+              message: `库 ${libraryName} 不存在`,
             },
           },
           { status: 404 }
         );
       }
 
-      const entries = library.entries as any[];
-      if (!entries || entries.length === 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: `Library has no entries: ${libraryName}`,
+      // Validate selected entry IDs exist
+      const selectedIds = strategyConfig[libraryName];
+      if (selectedIds && selectedIds.length > 0) {
+        const entries = library.entries as Record<string, any>;
+        const invalidIds = selectedIds.filter((id) => !entries[id]);
+
+        if (invalidIds.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: 'NOT_FOUND',
+                message: `库 ${libraryName} 中找不到以下元素：${invalidIds.join(', ')}`,
+              },
             },
-          },
-          { status: 400 }
-        );
-      }
-
-      libraryData[libraryName] = entries;
-    }
-
-    // Validate fixed libraries exist
-    for (const [libraryName, entryId] of Object.entries(fixed)) {
-      const library = await prisma.library.findUnique({
-        where: { name: libraryName },
-      });
-
-      if (!library) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: `Library not found: ${libraryName}`,
-            },
-          },
-          { status: 404 }
-        );
-      }
-
-      const entries = library.entries as any[];
-      const entryExists = entries.some((e) => e.id === entryId);
-
-      if (!entryExists) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: `Entry not found in ${libraryName}: ${entryId}`,
-            },
-          },
-          { status: 404 }
-        );
-      }
-    }
-
-    // Generate all combinations using cartesian product
-    const combinations: Array<{
-      combinationKey: string;
-      libraryIds: Record<string, string>;
-    }> = [];
-
-    // Helper function to generate cartesian product
-    function* cartesianProduct<T>(
-      arrays: T[][]
-    ): Generator<T[], void, unknown> {
-      if (arrays.length === 0) {
-        yield [];
-        return;
-      }
-
-      const [first, ...rest] = arrays;
-      for (const item of first) {
-        for (const combo of cartesianProduct(rest)) {
-          yield [item, ...combo];
+            { status: 404 }
+          );
         }
       }
     }
 
-    // Build arrays for cartesian product
-    const variableArrays = variable.map((libraryName) =>
-      libraryData[libraryName].map((entry) => ({
-        libraryName,
-        entryId: entry.id,
-      }))
+    // Generate combinations using ComboManager
+    const comboManager = new ComboManager();
+    const combinations = await comboManager.enumerateDynamicCombinations(
+      strategyConfig as Partial<Record<LibraryName, string[]>>
     );
 
-    // Generate combinations
-    for (const combo of cartesianProduct(variableArrays)) {
-      const libraryIds: Record<string, string> = { ...fixed };
-
-      for (const item of combo) {
-        libraryIds[item.libraryName] = item.entryId;
-      }
-
-      const combinationKey = generateCombinationKey(libraryIds);
-      combinations.push({ combinationKey, libraryIds });
-    }
-
-    // Create combinations in database, skipping duplicates
+    // Create Combination records in database
     const created: string[] = [];
     const skipped: string[] = [];
 
     for (const combo of combinations) {
       try {
+        // Use imageId as the unique combination key
         const existing = await prisma.combination.findUnique({
-          where: { combinationKey: combo.combinationKey },
+          where: { combinationKey: combo.imageId },
         });
 
         if (existing) {
-          skipped.push(combo.combinationKey);
+          skipped.push(combo.imageId);
           continue;
         }
 
         await prisma.combination.create({
           data: {
-            combinationKey: combo.combinationKey,
+            combinationKey: combo.imageId,
             libraryIds: combo.libraryIds,
             templateId,
-            strategyConfig: {
-              fixed: Object.keys(fixed),
-              variable,
-            },
+            strategyConfig,
           },
         });
 
-        created.push(combo.combinationKey);
+        created.push(combo.imageId);
       } catch (error) {
         // Handle unique constraint violation (race condition)
         if ((error as any).code === 'P2002') {
-          skipped.push(combo.combinationKey);
+          skipped.push(combo.imageId);
         } else {
           throw error;
         }
@@ -223,22 +218,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
+        templateId,
+        templateName: template.name,
         total: combinations.length,
         created: created.length,
         skipped: skipped.length,
-        createdKeys: created,
-        skippedKeys: skipped,
+        createdKeys: created.slice(0, 10), // Return first 10 for preview
+        skippedKeys: skipped.slice(0, 10),
       },
-      message: `Generated ${created.length} combinations (${skipped.length} already existed)`,
+      message: `成功生成 ${created.length} 个组合 (${skipped.length} 个已存在)`,
     });
   } catch (error) {
-    console.error('[API] POST /api/combinations/strategy error:', error);
+    console.error('[API] Error generating strategy combinations:', error);
+
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
-          message: 'Failed to generate combinations',
+          message: '生成策略组合时发生错误',
+          details: error instanceof Error ? error.message : String(error),
         },
       },
       { status: 500 }
