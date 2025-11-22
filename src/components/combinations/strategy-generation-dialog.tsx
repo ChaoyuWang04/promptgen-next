@@ -30,7 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { useTemplates, useTemplateLibraries } from '@/hooks/use-templates';
-import { useLibraries } from '@/hooks/use-libraries';
+import { useLibrary } from '@/hooks/use-libraries';
 import {
   usePreviewCombinations,
   useGenerateCombinations,
@@ -362,19 +362,17 @@ function LibraryElementSelector({
   selectedIds,
   onChange,
 }: LibraryElementSelectorProps) {
-  const { data: library, isLoading } = useLibraries();
+  const { data: library, isLoading } = useLibrary(libraryName);
   const entries = useMemo(() => {
     if (!library) return [];
-    const lib = library.find((l) => l.name === libraryName);
-    if (!lib) return [];
 
     // Extract entries from library.entries (which is a Record<string, any>)
-    const entriesObj = lib.entries as Record<string, any>;
+    const entriesObj = library.entries as Record<string, any>;
     return Object.entries(entriesObj).map(([id, data]) => ({
       id,
       name: data.name || id,
     }));
-  }, [library, libraryName]);
+  }, [library]);
 
   const handleToggle = (entryId: string) => {
     if (selectedIds.includes(entryId)) {
