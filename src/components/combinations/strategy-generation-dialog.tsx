@@ -49,20 +49,32 @@ export function StrategyGenerationDialog({
 }: StrategyGenerationDialogProps) {
   // State
   const [step, setStep] = useState<Step>('template');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedMainTemplateId, setSelectedMainTemplateId] = useState<string>('');
+  const [selectedDiffTemplateId, setSelectedDiffTemplateId] = useState<string>('');
   const [strategyConfig, setStrategyConfig] = useState<Record<string, string[]>>({});
 
   // Hooks
   const { data: templates, isLoading: isLoadingTemplates } = useTemplates();
-  const { data: templateLibraries } = useTemplateLibraries(selectedTemplateId);
+  const { data: templateLibraries } = useTemplateLibraries(selectedMainTemplateId);
   const previewMutation = usePreviewCombinations();
   const generateMutation = useGenerateCombinations();
+
+  // Separate main and diff templates
+  const mainTemplates = useMemo(
+    () => templates?.filter((t) => t.category === 'MAIN') || [],
+    [templates]
+  );
+  const diffTemplates = useMemo(
+    () => templates?.filter((t) => t.category === 'DIFF') || [],
+    [templates]
+  );
 
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
       setStep('template');
-      setSelectedTemplateId('');
+      setSelectedMainTemplateId('');
+      setSelectedDiffTemplateId('');
       setStrategyConfig({});
       previewMutation.reset();
     }
@@ -82,33 +94,58 @@ export function StrategyGenerationDialog({
   // Step 1: Template Selection
   const renderTemplateStep = () => (
     <div className="space-y-4">
-      <Label>选择模板</Label>
-      <Select
-        value={selectedTemplateId}
-        onValueChange={setSelectedTemplateId}
-        disabled={isLoadingTemplates}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="选择一个模板" />
-        </SelectTrigger>
-        <SelectContent>
-          {templates?.map((template) => (
-            <SelectItem key={template.id} value={template.id}>
-              <div className="flex items-center gap-2">
-                <Badge variant={template.category === 'MAIN' ? 'default' : 'secondary'}>
-                  {template.category}
-                </Badge>
-                <span>{template.name}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Main Template Selection */}
+      <div className="space-y-2">
+        <Label>主图模板 (Main Template)</Label>
+        <Select
+          value={selectedMainTemplateId}
+          onValueChange={setSelectedMainTemplateId}
+          disabled={isLoadingTemplates}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="选择主图模板" />
+          </SelectTrigger>
+          <SelectContent>
+            {mainTemplates.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">MAIN</Badge>
+                  <span>{template.name}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Diff Template Selection */}
+      <div className="space-y-2">
+        <Label>差异图模板 (Diff Template)</Label>
+        <Select
+          value={selectedDiffTemplateId}
+          onValueChange={setSelectedDiffTemplateId}
+          disabled={isLoadingTemplates}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="选择差异图模板" />
+          </SelectTrigger>
+          <SelectContent>
+            {diffTemplates.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">DIFF</Badge>
+                  <span>{template.name}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {templateLibraries && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">模板引用的库</CardTitle>
+            <CardTitle className="text-sm">主图模板引用的库</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
@@ -185,14 +222,18 @@ export function StrategyGenerationDialog({
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">模板名称</span>
-              <span className="font-medium">{preview.templateName}</span>
+              <span className="text-muted-foreground">主图模板</span>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">MAIN</Badge>
+                <span className="font-medium">{preview.mainTemplateName}</span>
+              </div>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">模板类型</span>
-              <Badge variant={preview.templateCategory === 'MAIN' ? 'default' : 'secondary'}>
-                {preview.templateCategory}
-              </Badge>
+              <span className="text-muted-foreground">差异图模板</span>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">DIFF</Badge>
+                <span className="font-medium">{preview.diffTemplateName}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -231,7 +272,8 @@ export function StrategyGenerationDialog({
   // Handle preview
   const handlePreview = async () => {
     await previewMutation.mutateAsync({
-      templateId: selectedTemplateId,
+      mainTemplateId: selectedMainTemplateId,
+      diffTemplateId: selectedDiffTemplateId,
       strategyConfig,
     });
     setStep('preview');
@@ -240,7 +282,8 @@ export function StrategyGenerationDialog({
   // Handle generate
   const handleGenerate = async () => {
     await generateMutation.mutateAsync({
-      templateId: selectedTemplateId,
+      mainTemplateId: selectedMainTemplateId,
+      diffTemplateId: selectedDiffTemplateId,
       strategyConfig,
     });
     onOpenChange(false);
@@ -248,7 +291,7 @@ export function StrategyGenerationDialog({
 
   // Navigation helpers
   const canGoNext = () => {
-    if (step === 'template') return !!selectedTemplateId && !!templateLibraries;
+    if (step === 'template') return !!selectedMainTemplateId && !!selectedDiffTemplateId && !!templateLibraries;
     if (step === 'configure') return true;
     if (step === 'preview') return !!previewMutation.data;
     return false;

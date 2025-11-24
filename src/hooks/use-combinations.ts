@@ -91,7 +91,8 @@ async function fetchApi<T>(
  * Hook to fetch combinations list with filters
  */
 export function useCombinations(filters: {
-  templateId?: string;
+  mainTemplateId?: string;
+  diffTemplateId?: string;
   search?: string;
   page?: number;
   pageSize?: number;
@@ -102,7 +103,8 @@ export function useCombinations(filters: {
     queryFn: async () => {
       const params = new URLSearchParams();
 
-      if (filters.templateId) params.set('templateId', filters.templateId);
+      if (filters.mainTemplateId) params.set('mainTemplateId', filters.mainTemplateId);
+      if (filters.diffTemplateId) params.set('diffTemplateId', filters.diffTemplateId);
       if (filters.search) params.set('search', filters.search);
       if (filters.page) params.set('page', String(filters.page));
       if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
@@ -308,7 +310,8 @@ export function useCreateCombination() {
   return useMutation({
     mutationFn: async (data: {
       libraryIds: Record<string, string>;
-      templateId?: string;
+      mainTemplateId?: string;
+      diffTemplateId?: string;
     }) => {
       const response = await fetchApi<Combination>(API_BASE, {
         method: 'POST',
@@ -353,14 +356,16 @@ export interface LibrarySummary {
 }
 
 export interface PreviewCombinationsRequest {
-  templateId: string;
+  mainTemplateId: string;
+  diffTemplateId: string;
   strategyConfig: Record<string, string[]>;
 }
 
 export interface PreviewCombinationsResponse {
-  templateId: string;
-  templateName: string;
-  templateCategory: 'MAIN' | 'DIFF';
+  mainTemplateId: string;
+  mainTemplateName: string;
+  diffTemplateId: string;
+  diffTemplateName: string;
   totalCombinations: number;
   librarySummary: LibrarySummary[];
   strategyConfig: Record<string, string[]>;

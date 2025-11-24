@@ -42,4 +42,6 @@ next-env.d.ts
 # test results
 /test-results/
 /playwright-report/
-/playwright/.cache/
+/playwright/.cache
+/public
+/context/old_project/

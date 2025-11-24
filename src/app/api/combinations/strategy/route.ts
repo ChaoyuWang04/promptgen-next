@@ -4,7 +4,8 @@
  *
  * NEW FORMAT (v2):
  * {
- *   templateId: "template_main_v1",
+ *   mainTemplateId: "template_main_v1",
+ *   diffTemplateId: "diff_template_default_v1",
  *   strategyConfig: {
  *     character: ["char_betty_v1", "char_alice_v1"],  // Multi-select
  *     theme: ["theme_christmas_v1"],                   // Single-select (as array)
@@ -24,10 +25,11 @@ import {
 import type { LibraryName } from '@/lib/config/library-config';
 
 /**
- * Request schema (v2 - multi-select support)
+ * Request schema (v2 - multi-select support with separate main/diff templates)
  */
 const StrategyGenerationRequestSchema = z.object({
-  templateId: z.string().min(1, '模板ID不能为空'),
+  mainTemplateId: z.string().min(1, '主图模板ID不能为空'),
+  diffTemplateId: z.string().min(1, '差异图模板ID不能为空'),
   strategyConfig: z
     .record(z.array(z.string()))
     .describe(
@@ -62,11 +64,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { templateId, strategyConfig } = parseResult.data;
+    const { mainTemplateId, diffTemplateId, strategyConfig } = parseResult.data;
 
-    // Validate template exists
-    const template = await prisma.template.findUnique({
-      where: { id: templateId },
+    // Validate main template exists
+    const mainTemplate = await prisma.template.findUnique({
+      where: { id: mainTemplateId },
       select: {
         id: true,
         name: true,
@@ -75,25 +77,75 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!template) {
+    if (!mainTemplate) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: `模板 ${templateId} 不存在`,
+            message: `主图模板 ${mainTemplateId} 不存在`,
           },
         },
         { status: 404 }
       );
     }
 
-    // Extract and validate libraries from template
-    const templateLibraries = extractLibrariesFromTemplate(template.content);
+    if (mainTemplate.category !== 'MAIN') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `模板 ${mainTemplate.name} 不是主图模板（类型为 ${mainTemplate.category}）`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate diff template exists
+    const diffTemplate = await prisma.template.findUnique({
+      where: { id: diffTemplateId },
+      select: {
+        id: true,
+        name: true,
+        content: true,
+        category: true,
+      },
+    });
+
+    if (!diffTemplate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `差异图模板 ${diffTemplateId} 不存在`,
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    if (diffTemplate.category !== 'DIFF') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `模板 ${diffTemplate.name} 不是差异图模板（类型为 ${diffTemplate.category}）`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // Extract and validate libraries from main template
+    const templateLibraries = extractLibrariesFromTemplate(mainTemplate.content);
 
     const validation = validateTemplateLibraryReferences(
-      template.content,
-      template.category
+      mainTemplate.content,
+      mainTemplate.category
     );
 
     if (!validation.isValid) {
@@ -199,7 +251,8 @@ export async function POST(request: NextRequest) {
           data: {
             combinationKey: combo.imageId,
             libraryIds: combo.libraryIds,
-            templateId,
+            mainTemplateId,
+            diffTemplateId,
             strategyConfig,
           },
         });
@@ -218,8 +271,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        templateId,
-        templateName: template.name,
+        mainTemplateId,
+        mainTemplateName: mainTemplate.name,
+        diffTemplateId,
+        diffTemplateName: diffTemplate.name,
         total: combinations.length,
         created: created.length,
         skipped: skipped.length,

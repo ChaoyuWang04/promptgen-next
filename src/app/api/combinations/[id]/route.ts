@@ -25,7 +25,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const combination = await prisma.combination.findUnique({
       where: { id },
       include: {
-        template: {
+        mainTemplate: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+          },
+        },
+        diffTemplate: {
           select: {
             id: true,
             name: true,

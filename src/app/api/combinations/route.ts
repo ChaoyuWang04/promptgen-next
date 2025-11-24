@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
 
     // Parse query parameters
     const filterData = {
-      templateId: searchParams.get('templateId') || undefined,
+      mainTemplateId: searchParams.get('mainTemplateId') || undefined,
+      diffTemplateId: searchParams.get('diffTemplateId') || undefined,
       search: searchParams.get('search') || undefined,
       page: parseInt(searchParams.get('page') || '1', 10),
       pageSize: parseInt(searchParams.get('pageSize') || '20', 10),
@@ -54,13 +55,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { templateId, libraryFilters: libFilters, search, page, pageSize } = validationResult.data;
+    const { mainTemplateId, diffTemplateId, libraryFilters: libFilters, search, page, pageSize } = validationResult.data;
 
     // Build where clause
     const where: any = {};
 
-    if (templateId) {
-      where.templateId = templateId;
+    if (mainTemplateId) {
+      where.mainTemplateId = mainTemplateId;
+    }
+
+    if (diffTemplateId) {
+      where.diffTemplateId = diffTemplateId;
     }
 
     if (search) {
@@ -90,7 +95,14 @@ export async function GET(request: NextRequest) {
         _count: {
           select: { records: true },
         },
-        template: {
+        mainTemplate: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+          },
+        },
+        diffTemplate: {
           select: {
             id: true,
             name: true,
@@ -155,7 +167,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { libraryIds, templateId, strategyConfig } = validationResult.data;
+    const { libraryIds, mainTemplateId, diffTemplateId, strategyConfig } = validationResult.data;
 
     // Generate combination key if not provided
     let combinationKey = validationResult.data.combinationKey;
@@ -204,14 +216,22 @@ export async function POST(request: NextRequest) {
       data: {
         combinationKey,
         libraryIds,
-        templateId,
+        mainTemplateId,
+        diffTemplateId,
         strategyConfig: strategyConfig ?? undefined,
       },
       include: {
         _count: {
           select: { records: true },
         },
-        template: {
+        mainTemplate: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+          },
+        },
+        diffTemplate: {
           select: {
             id: true,
             name: true,

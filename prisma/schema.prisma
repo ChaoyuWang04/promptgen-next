@@ -21,9 +21,13 @@ model Combination {
   // 库选择（动态JSON结构，支持3-N个库）
   libraryIds      Json     // {"character": "char_betty_v1", "theme": "theme_christmas_v1", ...}
 
-  // 模板和策略配置
-  templateId      String?  // 关联的模板ID
-  template        Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  // 模板关联（Main和Diff模板分别关联）
+  mainTemplateId  String?  // 主图模板ID
+  mainTemplate    Template? @relation("MainTemplate", fields: [mainTemplateId], references: [id], onDelete: SetNull)
+  diffTemplateId  String?  // 差异图模板ID
+  diffTemplate    Template? @relation("DiffTemplate", fields: [diffTemplateId], references: [id], onDelete: SetNull)
+
+  // 策略配置
   strategyConfig  Json?    // 策略配置: {"fixed": ["character"], "variable": ["theme", "scene"]}
 
   // 关联关系
@@ -34,7 +38,8 @@ model Combination {
   updatedAt       DateTime @updatedAt
 
   @@index([combinationKey])
-  @@index([templateId])
+  @@index([mainTemplateId])
+  @@index([diffTemplateId])
 }
 
 // ========================================
@@ -160,8 +165,9 @@ model Template {
   category     TemplateCategory // MAIN 或 DIFF
   content      String           @db.Text  // 模板内容（可能很长）
 
-  // 关联关系
-  combinations Combination[]    // 使用此模板的组合
+  // 关联关系（区分Main模板和Diff模板的使用）
+  mainCombinations Combination[] @relation("MainTemplate")  // 作为Main模板使用的组合
+  diffCombinations Combination[] @relation("DiffTemplate")  // 作为Diff模板使用的组合
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

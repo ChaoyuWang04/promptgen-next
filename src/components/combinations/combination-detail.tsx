@@ -122,47 +122,47 @@ export function CombinationDetail({ combination }: CombinationDetailProps) {
       </div>
 
       {/* Template Info */}
-      {combination.template && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileCode className="h-5 w-5" />
-              生成模板
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">基于</span>
-              <Badge
-                variant={combination.template.category === 'MAIN' ? 'default' : 'secondary'}
-              >
-                {combination.template.category}
-              </Badge>
-              <span className="font-medium">{combination.template.name}</span>
-              <span className="text-sm text-muted-foreground">模板生成</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileCode className="h-5 w-5" />
+            生成模板
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Main Template */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground w-20">主图模板:</span>
+            {combination.mainTemplate ? (
+              <>
+                <Badge variant="default">MAIN</Badge>
+                <span className="font-medium">{combination.mainTemplate.name}</span>
+              </>
+            ) : (
+              <Badge variant="outline">未关联</Badge>
+            )}
+          </div>
 
-      {!combination.template && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileCode className="h-5 w-5" />
-              生成模板
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">未关联模板</Badge>
-              <span className="text-sm text-muted-foreground">
-                该组合未通过策略生成，或关联的模板已被删除
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Diff Template */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground w-20">差异图模板:</span>
+            {combination.diffTemplate ? (
+              <>
+                <Badge variant="secondary">DIFF</Badge>
+                <span className="font-medium">{combination.diffTemplate.name}</span>
+              </>
+            ) : (
+              <Badge variant="outline">未关联</Badge>
+            )}
+          </div>
+
+          {!combination.mainTemplate && !combination.diffTemplate && (
+            <p className="text-sm text-muted-foreground">
+              该组合未通过策略生成，或关联的模板已被删除
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Combination Info */}
       <Card>

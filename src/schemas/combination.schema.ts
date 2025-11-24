@@ -24,7 +24,8 @@ export const CombinationSchema = z.object({
   id: z.string().cuid().optional(),
   combinationKey: z.string(), // betty_christmas_entrance
   libraryIds: LibraryIdsSchema,
-  templateId: z.string().nullable().optional(),
+  mainTemplateId: z.string().nullable().optional(), // 主图模板ID
+  diffTemplateId: z.string().nullable().optional(), // 差异图模板ID
   strategyConfig: StrategyConfigSchema.nullable().optional(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
@@ -73,7 +74,8 @@ export const StrategyGenerationRequestSchemaV1 = z.object({
  *
  * Format:
  * {
- *   templateId: "template_main_v1",
+ *   mainTemplateId: "template_main_v1",
+ *   diffTemplateId: "diff_template_default_v1",
  *   strategyConfig: {
  *     character: ["char_betty_v1", "char_alice_v1"],  // Multi-select
  *     theme: ["theme_christmas_v1"],                   // Single-select (as array)
@@ -82,7 +84,8 @@ export const StrategyGenerationRequestSchemaV1 = z.object({
  * }
  */
 export const StrategyGenerationRequestSchemaV2 = z.object({
-  templateId: z.string().min(1, '模板ID不能为空'),
+  mainTemplateId: z.string().min(1, '主图模板ID不能为空'),
+  diffTemplateId: z.string().min(1, '差异图模板ID不能为空'),
   strategyConfig: z
     .record(z.array(z.string()))
     .describe(
@@ -117,7 +120,8 @@ export const GenerateLanguageRequestSchema = z.object({
 // ========================================
 
 export const CombinationFilterSchema = z.object({
-  templateId: z.string().optional(),
+  mainTemplateId: z.string().optional(), // 按主图模板过滤
+  diffTemplateId: z.string().optional(), // 按差异图模板过滤
   libraryFilters: z.record(z.string(), z.string()).optional(), // { "character": "char_betty_v1" }
   search: z.string().optional(),
   page: z.number().int().positive().default(1),
@@ -166,7 +170,8 @@ export const CombinationListResponseSchema = z.object({
     _count: z.object({
       records: z.number(),
     }).optional(),
-    template: TemplateInfoSchema,
+    mainTemplate: TemplateInfoSchema, // 主图模板信息
+    diffTemplate: TemplateInfoSchema, // 差异图模板信息
   })),
   total: z.number(),
   page: z.number(),

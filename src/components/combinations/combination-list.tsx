@@ -15,7 +15,12 @@ interface CombinationItem {
   _count?: {
     records: number;
   };
-  template?: {
+  mainTemplate?: {
+    id: string;
+    name: string;
+    category: 'MAIN' | 'DIFF';
+  } | null;
+  diffTemplate?: {
     id: string;
     name: string;
     category: 'MAIN' | 'DIFF';
@@ -58,18 +63,18 @@ export function CombinationList({
               <p className="font-medium truncate">{combo.combinationKey}</p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{Object.keys(combo.libraryIds).length} 个库元素</span>
-                {combo.template && (
+                {combo.mainTemplate && (
                   <>
                     <span>·</span>
                     <Badge
-                      variant={combo.template.category === 'MAIN' ? 'default' : 'secondary'}
+                      variant="default"
                       className="text-xs h-5"
                     >
-                      {combo.template.name}
+                      {combo.mainTemplate.name}
                     </Badge>
                   </>
                 )}
-                {!combo.template && (
+                {!combo.mainTemplate && (
                   <>
                     <span>·</span>
                     <Badge variant="outline" className="text-xs h-5">

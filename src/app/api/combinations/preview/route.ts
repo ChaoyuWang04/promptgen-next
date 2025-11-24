@@ -22,7 +22,8 @@ import {
  * Request schema
  */
 const PreviewRequestSchema = z.object({
-  templateId: z.string().min(1, '模板ID不能为空'),
+  mainTemplateId: z.string().min(1, '主图模板ID不能为空'),
+  diffTemplateId: z.string().min(1, '差异图模板ID不能为空'),
   strategyConfig: z
     .record(z.array(z.string()))
     .describe('库选择配置，格式：{ character: ["id1"], theme: ["id2", "id3"] }'),
@@ -56,11 +57,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { templateId, strategyConfig } = parseResult.data;
+    const { mainTemplateId, diffTemplateId, strategyConfig } = parseResult.data;
 
-    // Fetch template
-    const template = await prisma.template.findUnique({
-      where: { id: templateId },
+    // Fetch main template
+    const mainTemplate = await prisma.template.findUnique({
+      where: { id: mainTemplateId },
       select: {
         id: true,
         name: true,
@@ -70,25 +71,48 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!template) {
+    if (!mainTemplate) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'NOT_FOUND',
-            message: `模板 ${templateId} 不存在`,
+            message: `主图模板 ${mainTemplateId} 不存在`,
           },
         },
         { status: 404 }
       );
     }
 
-    // Extract and validate libraries from template
-    const templateLibraries = extractLibrariesFromTemplate(template.content);
+    // Fetch diff template
+    const diffTemplate = await prisma.template.findUnique({
+      where: { id: diffTemplateId },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+      },
+    });
+
+    if (!diffTemplate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `差异图模板 ${diffTemplateId} 不存在`,
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    // Extract and validate libraries from main template
+    const templateLibraries = extractLibrariesFromTemplate(mainTemplate.content);
 
     const validation = validateTemplateLibraryReferences(
-      template.content,
-      template.category
+      mainTemplate.content,
+      mainTemplate.category
     );
 
     if (!validation.isValid) {
@@ -194,9 +218,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        templateId: template.id,
-        templateName: template.name,
-        templateCategory: template.category,
+        mainTemplateId: mainTemplate.id,
+        mainTemplateName: mainTemplate.name,
+        diffTemplateId: diffTemplate.id,
+        diffTemplateName: diffTemplate.name,
         totalCombinations,
         librarySummary,
         strategyConfig,

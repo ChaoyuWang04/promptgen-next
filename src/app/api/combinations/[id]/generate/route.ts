@@ -41,13 +41,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
 
-    // Find the combination
+    // Find the combination with template info
     const combination = await prisma.combination.findUnique({
       where: { id },
       include: {
         records: {
           orderBy: { variantNumber: 'desc' },
           take: 1,
+        },
+        mainTemplate: {
+          select: { id: true, name: true, category: true },
+        },
+        diffTemplate: {
+          select: { id: true, name: true, category: true },
         },
       },
     });
@@ -94,10 +100,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Step 1: Generate prompts
       console.log(`[Variant Generation] Generating prompts for ${imageId}...`);
 
-      // Generate main prompt (don't save to DB - we manage record ourselves)
+      // Determine template names from combination or fallback to defaults
+      const mainTemplateName = combination.mainTemplate?.name ?? 'template_default_v1';
+      const diffTemplateName = combination.diffTemplate?.name ?? 'diff_template_default_v1';
+
+      console.log(`[Variant Generation] Using templates - Main: ${mainTemplateName}, Diff: ${diffTemplateName}`);
+
+      // Generate main prompt using the associated template
       const mainPromptResult = await generateMainPrompt(
         libraryIds as any,
-        'template_default_v1',
+        mainTemplateName,
         false // Don't save to database - record already created above
       );
 
@@ -115,10 +127,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       });
 
-      // Generate diff prompt (don't save to DB - we manage prompts ourselves)
+      // Generate diff prompt using the associated template
       const diffPromptResult = await generateDiffPrompt(
         imageId,
-        'diff_template_default_v1', // Correct parameter: templateName
+        diffTemplateName,
         false // Don't save to database
       );
 

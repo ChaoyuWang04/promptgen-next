@@ -40,7 +40,7 @@ export default function CombinationsPage() {
     isLoading: isListLoading,
     error: listError,
   } = useCombinations({
-    templateId: templateFilter || undefined,
+    mainTemplateId: templateFilter || undefined,
     search: search || undefined,
     page,
     pageSize: 20,
