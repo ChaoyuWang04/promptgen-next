@@ -1,8 +1,8 @@
 # PromptGen Next.js重构任务追踪清单
 
-**文档版本**: 2.0.2
+**文档版本**: 2.0.3
 **创建日期**: 2025-11-15
-**最后更新**: 2025-11-20 (Added: Library Entries Batch Delete)
+**最后更新**: 2025-11-24 (Added: Combinations Batch Delete + Infinite Scroll)
 **状态**: Phase 5 完成 ✅ (71%总进度)
 
 ---
@@ -990,6 +990,188 @@ if (structureType === 'nested_array') {
 
 ---
 
+### Feature Enhancement: Combinations Batch Delete + Infinite Scroll
+**完成日期**: 2025-11-24
+**状态**: ✅ **COMPLETE**
+
+#### 需求描述
+在组合管理界面添加批量删除功能和无限滚动列表，提升用户操作效率：
+1. 添加批量删除按钮，可复选指定组合
+2. 支持一键全选组合
+3. 删除组合时同时删除相关的Record、Prompt、生成的图片文件
+4. 左侧组合列表从分页模式改为无限滚动模式
+
+#### 实施方案
+
+##### 1. 批量删除 API 端点（新增）
+**文件**: `src/app/api/combinations/batch/route.ts`（120 lines）
+
+核心功能：
+- DELETE 方法，接收 `{ ids: string[] }` 请求体
+- 使用 Prisma 事务批量删除：ImageVariant → Prompt → Record → Combination
+- 并行删除所有关联的文件目录
+- 返回删除成功的数量和组合键列表
+
+API接口：
+```typescript
+DELETE /api/combinations/batch
+Body: { ids: string[] }
+Response: {
+  success: true,
+  data: {
+    deletedCount: number,
+    deletedKeys: string[]
+  },
+  message: string
+}
+```
+
+##### 2. React Query Hooks（修改）
+**文件**: `src/hooks/use-combinations.ts`（+100 lines）
+
+新增 Hooks：
+- `useInfiniteCombinations()` - 基于 `useInfiniteQuery` 实现无限滚动
+- `useDeleteCombinationsBatch()` - 批量删除 mutation
+
+功能特性：
+- 支持 `fetchNextPage()` 加载更多数据
+- `getNextPageParam()` 自动计算下一页参数
+- 删除成功后自动失效缓存并刷新列表
+
+##### 3. 组合列表组件（重写）
+**文件**: `src/components/combinations/combination-list.tsx`（180 lines）
+
+新增功能：
+- `selectionMode` - 选择模式开关
+- `selectedIds` - 已选中的组合ID集合
+- `onSelectionChange` - 选择变更回调
+- `hasNextPage` / `isFetchingNextPage` - 无限滚动状态
+- `onLoadMore` - 加载更多回调
+
+UI变更：
+- 每个组合项前添加复选框（选择模式下显示）
+- 列表底部添加加载更多指示器
+- 使用 IntersectionObserver 实现自动加载
+
+##### 4. 组合管理主页面（重写）
+**文件**: `src/app/(dashboard)/combinations/page.tsx`（370 lines）
+
+状态管理：
+- `selectionMode` - 是否处于选择模式
+- `selectedIds` - 已选中的组合ID集合（Set<string>）
+
+UI变更：
+- 移除分页控件，改用无限滚动
+- 添加"批量选择"/"退出选择"切换按钮
+- 添加全选/取消全选复选框
+- 添加"已选 N"计数徽章
+- 添加红色删除按钮（带确认对话框）
+- 显示"共 N 个组合 (已加载 M)"统计
+
+#### 测试验证
+
+##### Playwright自动化测试结果
+**测试环境**: http://localhost:3000/combinations
+
+**测试场景1：无限滚动**
+- ✅ 初始加载显示"共 82 个组合 (已加载 20)"
+- ✅ 滚动到底部自动加载更多数据
+- ✅ 加载后显示"(已加载 40)"
+
+**测试场景2：批量选择模式**
+- ✅ 点击"批量选择"按钮进入选择模式
+- ✅ 按钮变为"退出选择"
+- ✅ 每个组合项前显示复选框
+- ✅ 选中组合后显示"已选 N"
+- ✅ 删除按钮启用
+
+**测试场景3：全选功能**
+- ✅ 点击全选复选框选中所有已加载的组合
+- ✅ 显示"已选 20"和"取消全选"
+- ✅ 再次点击取消全选
+
+**测试场景4：批量删除确认**
+- ✅ 点击删除按钮弹出确认对话框
+- ✅ 显示将要删除的组合数量
+- ✅ 警告信息提示将删除关联的变体、Prompt和图片
+
+#### 功能特性总结
+
+**批量删除流程**：
+```
+用户点击"批量选择" → selectionMode = true → 显示复选框
+用户选中组合 → selectedIds.add(id) → 显示删除按钮和计数
+用户点击删除 → 确认对话框 → API调用 → 刷新数据
+用户退出选择模式 → selectionMode = false → 清空选择
+```
+
+**无限滚动流程**：
+```
+页面加载 → useInfiniteCombinations() 获取第一页
+用户滚动 → IntersectionObserver 检测底部
+触发加载 → fetchNextPage() 获取下一页
+数据合并 → flatMap(pages) 展示所有组合
+```
+
+**关联数据清理**：
+1. ✅ 删除所有 ImageVariant 记录
+2. ✅ 删除所有 Prompt 记录
+3. ✅ 删除所有 Record 记录
+4. ✅ 删除 Combination 记录
+5. ✅ 删除文件系统中的图片目录
+
+#### 影响范围
+- **新增文件**: 1个（批量删除API路由）
+- **修改文件**: 3个（hooks + 列表组件 + 主页面）
+- **代码变更**: +550 lines / -87 lines
+- **受益功能**: 组合管理的批量操作和列表浏览
+
+#### 技术细节
+
+**IntersectionObserver配置**：
+```typescript
+const observer = new IntersectionObserver(handleObserver, {
+  root: null,      // 使用viewport
+  rootMargin: '100px',  // 提前100px触发
+  threshold: 0,
+});
+```
+
+**React Query无限查询**：
+```typescript
+useInfiniteQuery({
+  queryKey: [...combinationKeys.lists(), 'infinite', filters],
+  queryFn: async ({ pageParam = 1 }) => { ... },
+  initialPageParam: 1,
+  getNextPageParam: (lastPage) =>
+    lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+});
+```
+
+**批量删除事务**：
+```typescript
+await prisma.$transaction(async (tx) => {
+  await tx.imageVariant.deleteMany({ where: { recordId: { in: allRecordIds } } });
+  await tx.prompt.deleteMany({ where: { recordId: { in: allRecordIds } } });
+  await tx.record.deleteMany({ where: { combinationId: { in: combinationIds } } });
+  await tx.combination.deleteMany({ where: { id: { in: combinationIds } } });
+});
+```
+
+#### 完成标准
+- ✅ 批量删除API端点实现并测试通过
+- ✅ useInfiniteCombinations hook实现无限滚动
+- ✅ useDeleteCombinationsBatch hook实现批量删除
+- ✅ 组合列表组件添加复选框和无限滚动
+- ✅ 主页面添加批量选择UI和状态管理
+- ✅ 全选/取消全选功能正常
+- ✅ 删除确认对话框显示正确的警告信息
+- ✅ TypeScript类型检查通过
+- ✅ 构建成功
+- ✅ 文档更新完成
+
+---
+
 ### Phase 6: 测试与部署 🚀
 **目标**: 完善测试覆盖，部署生产环境
 **预计时长**: 1.5周
@@ -1190,7 +1372,7 @@ if (structureType === 'nested_array') {
 
 ---
 
-**最后更新**: 2025-11-18
+**最后更新**: 2025-11-24
 **下一步**: Phase 6 - 测试与部署
 
 *详细设计文档请参考 [prd.md](./prd.md)*
