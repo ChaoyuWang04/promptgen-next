@@ -94,31 +94,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Step 1: Generate prompts
       console.log(`[Variant Generation] Generating prompts for ${imageId}...`);
 
-      const mainPromptResult = await generateMainPrompt(libraryIds as any);
-      const diffPromptResult = await generateDiffPrompt(
-        imageId,
-        libraryIds as any
+      // Generate main prompt (don't save to DB - we manage record ourselves)
+      const mainPromptResult = await generateMainPrompt(
+        libraryIds as any,
+        'template_default_v1',
+        false // Don't save to database - record already created above
       );
 
-      // Save prompts to database
-      await prisma.prompt.createMany({
-        data: [
-          {
-            recordId: record.id,
-            type: 'MAIN',
-            promptCn: mainPromptResult.prompt_cn || '',
-            promptEn: mainPromptResult.prompt_en || '',
-          },
-          {
-            recordId: record.id,
-            type: 'DIFF',
-            promptCn: diffPromptResult.prompt_cn || '',
-            promptEn: diffPromptResult.prompt_en || '',
-          },
-        ],
-      });
-
-      // Update outfit state from prompt generation
+      // Update record with outfit state and mark promptGenerated=true
+      // This is required BEFORE calling generateDiffPrompt
       await prisma.record.update({
         where: { id: record.id },
         data: {
@@ -129,6 +113,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
           promptGenerated: true,
         },
+      });
+
+      // Generate diff prompt (don't save to DB - we manage prompts ourselves)
+      const diffPromptResult = await generateDiffPrompt(
+        imageId,
+        'diff_template_default_v1', // Correct parameter: templateName
+        false // Don't save to database
+      );
+
+      // Save prompts to database
+      // Note: prompt_en is currently same as prompt_cn since no translation service yet
+      await prisma.prompt.createMany({
+        data: [
+          {
+            recordId: record.id,
+            type: 'MAIN',
+            promptCn: mainPromptResult.prompt_cn || '',
+            promptEn: mainPromptResult.prompt_cn || '', // TODO: Add translation
+          },
+          {
+            recordId: record.id,
+            type: 'DIFF',
+            promptCn: diffPromptResult.prompt_cn || '',
+            promptEn: diffPromptResult.prompt_cn || '', // TODO: Add translation
+          },
+        ],
       });
 
       // Step 2: Generate images
@@ -166,20 +176,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const stitcher = new ImageStitcher();
 
       // Round 1: Generate main image
-      console.log(`[Variant Generation] Round 1: Main image...`);
-      const mainResult = await providerManager.generateWithFallback(
-        mainPromptResult.prompt_en || ''
-      );
+      // Note: Using Chinese prompt directly since Gemini can handle it
+      // TODO: Add translation service for proper English prompts
+      const mainPrompt = mainPromptResult.prompt_cn || '';
+      console.log(`[Variant Generation] Round 1: Main image with prompt (first 200 chars): ${mainPrompt.substring(0, 200)}...`);
+      const mainResult = await providerManager.generateWithFallback(mainPrompt);
 
       await fs.writeFile(paths.mainImage, mainResult.image);
 
       // Round 2: Generate diff image with same provider
+      // Note: Using Chinese prompt directly since Gemini can handle it
+      const diffPrompt = diffPromptResult.prompt_cn || '';
       console.log(
-        `[Variant Generation] Round 2: Diff image with ${mainResult.provider}...`
+        `[Variant Generation] Round 2: Diff image with ${mainResult.provider}, prompt (first 200 chars): ${diffPrompt.substring(0, 200)}...`
       );
       const diffImage = await providerManager.generateWithProvider(
         mainResult.provider,
-        diffPromptResult.prompt_en || '',
+        diffPrompt,
         mainResult.image
       );
 

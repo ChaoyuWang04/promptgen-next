@@ -37,15 +37,14 @@ export interface TemplateVariablesResponse {
 }
 
 export interface PreviewRequest {
-  template_content: string;
+  content: string;
   library_ids: Record<string, string>;
-  type?: 'MAIN' | 'DIFF';
+  enable_modules?: boolean;
 }
 
 export interface PreviewResponse {
-  prompt_cn: string;
-  prompt_en: string;
-  variables_used: string[];
+  rendered: string;
+  library_ids: Record<string, string>;
 }
 
 /**
@@ -53,7 +52,10 @@ export interface PreviewResponse {
  */
 export function useTemplates(type?: 'SYSTEM' | 'USER', category?: 'MAIN' | 'DIFF') {
   return useQuery<Template[]>({
-    queryKey: queryKeys.templates.list(type, category),
+    queryKey: queryKeys.templates.list(
+      category?.toLowerCase() as 'main' | 'diff' | undefined,
+      type?.toLowerCase() as 'system' | 'user' | undefined
+    ),
     queryFn: () => {
       const params: Record<string, string> = {};
       if (type) params.type = type;
@@ -79,7 +81,7 @@ export function useTemplate(id: string) {
  */
 export function useTemplateVariables(type: 'MAIN' | 'DIFF' = 'MAIN') {
   return useQuery<TemplateVariablesResponse>({
-    queryKey: queryKeys.templates.variables(type),
+    queryKey: queryKeys.templates.variables(type.toLowerCase() as 'main' | 'diff'),
     queryFn: async () => {
       const response = await fetch(`/api/templates/variables?type=${type}`);
       const result = await response.json();

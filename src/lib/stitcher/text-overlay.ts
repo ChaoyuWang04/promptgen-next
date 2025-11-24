@@ -95,7 +95,7 @@ export class TextOverlay {
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Noto+Sans+KR:wght@700&family=Noto+Sans+SC:wght@700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&amp;family=Noto+Sans+KR:wght@700&amp;family=Noto+Sans+SC:wght@700&amp;display=swap');
           </style>
           <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>

@@ -173,9 +173,10 @@ export enum ProviderName {
 
 /**
  * Provider timeout configuration (in milliseconds)
+ * Matches old Python system's configuration
  */
 export const PROVIDER_TIMEOUT = {
-  GEMINI: 60000, // 60 seconds
+  GEMINI: 120000, // 120 seconds (matches old system)
   BYTEDANCE: 60000, // 60 seconds
   HEALTH_CHECK: 10000, // 10 seconds
 } as const;

@@ -118,8 +118,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      rendered,
-      library_ids,
+      data: {
+        rendered,
+        library_ids,
+      },
     });
   } catch (error) {
     console.error('[POST /api/templates/render] Error:', error);

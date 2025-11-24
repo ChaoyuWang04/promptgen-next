@@ -1,11 +1,23 @@
 /**
  * Image Stitcher
- * Stitches main and diff images side-by-side with multi-language text overlay
+ * Complete replication of Python stitch_generator.py algorithm
+ * Stitches main and diff images side-by-side with multi-language game narrative text
  */
 
 import fs from 'fs/promises';
 import sharp from 'sharp';
-import { TextOverlay } from './text-overlay';
+import { createCanvas, Image, loadImage } from 'canvas';
+import {
+  getLanguageTemplate,
+  getLanguageFontSize,
+  isValidLanguageId,
+} from './languages';
+import { loadFont } from './font-loader';
+import {
+  drawTwoLineCenteredText,
+  getLineHeight,
+} from './canvas-renderer';
+import { StitchConfig, StitchResult, DEFAULT_STITCH_CONFIG } from './types';
 
 /**
  * Stitch options
@@ -30,28 +42,30 @@ export interface StitchOptions {
    * Language ID for text overlay (1-7)
    */
   languageId: number;
+
+  /**
+   * Optional configuration overrides
+   */
+  config?: Partial<StitchConfig>;
 }
 
 /**
  * Image Stitcher Class
- * Handles horizontal stitching of main and diff images with text overlay
+ * Matches Python's stitch_generator.py logic exactly
  */
 export class ImageStitcher {
-  private textOverlay: TextOverlay;
+  private config: StitchConfig;
 
-  // Standard image dimensions for 9:16 aspect ratio
-  // ByteDance: 1440x2560, Gemini: 9:16 ratio
-  private readonly SINGLE_IMAGE_WIDTH = 1440;
-  private readonly SINGLE_IMAGE_HEIGHT = 2560;
-  private readonly STITCHED_WIDTH = 2880; // 1440 * 2
-  private readonly STITCHED_HEIGHT = 2560;
+  // Fixed canvas width (matches Python CANVAS_WIDTH)
+  private readonly CANVAS_WIDTH = 2880;
 
-  constructor() {
-    this.textOverlay = new TextOverlay();
+  constructor(config?: Partial<StitchConfig>) {
+    this.config = { ...DEFAULT_STITCH_CONFIG, ...config };
   }
 
   /**
-   * Stitch main and diff images side-by-side with text overlay
+   * Stitch main and diff images with game narrative text
+   * Main entry point - matches Python's generate() function
    */
   async stitch(options: StitchOptions): Promise<string> {
     const { mainImagePath, diffImagePath, outputPath, languageId } = options;
@@ -59,59 +73,137 @@ export class ImageStitcher {
     console.log(
       `[ImageStitcher] Stitching ${mainImagePath} + ${diffImagePath} → ${outputPath}`
     );
+    console.log(`[ImageStitcher] Language ID: ${languageId}`);
 
     try {
-      // Load both images
-      const [mainImageBuffer, diffImageBuffer] = await Promise.all([
-        fs.readFile(mainImagePath),
-        fs.readFile(diffImagePath),
+      // Validate language ID
+      if (!isValidLanguageId(languageId)) {
+        throw new Error(`Invalid language ID: ${languageId}. Must be 1-7.`);
+      }
+
+      // Get language configuration
+      const template = getLanguageTemplate(languageId);
+      const fontSize = getLanguageFontSize(languageId);
+
+      console.log(`[ImageStitcher] Language: ${template.name}, Font size: ${fontSize}px`);
+
+      // Load font
+      const fontFamily = loadFont(languageId);
+
+      // Generate random numbers for template variables
+      const tries = this.randomInt(this.config.triesMin, this.config.triesMax);
+      const diffs = this.randomInt(this.config.diffsMin, this.config.diffsMax);
+
+      console.log(`[ImageStitcher] Random values: tries=${tries}, diffs=${diffs}`);
+
+      // Substitute template variables
+      const line1 = this.substituteVariables(template.line1, { tries, diffs });
+      const line2 = this.substituteVariables(template.line2, { tries, diffs });
+
+      console.log(`[ImageStitcher] Line 1: ${line1}`);
+      console.log(`[ImageStitcher] Line 2: ${line2}`);
+
+      // Load images
+      const [mainImage, diffImage] = await Promise.all([
+        loadImage(mainImagePath),
+        loadImage(diffImagePath),
       ]);
 
-      // Verify and resize images to standard size if needed
-      const [mainResized, diffResized] = await Promise.all([
-        this.ensureImageSize(mainImageBuffer, 'main'),
-        this.ensureImageSize(diffImageBuffer, 'diff'),
-      ]);
+      console.log(
+        `[ImageStitcher] Loaded images: main=${mainImage.width}x${mainImage.height}, diff=${diffImage.width}x${diffImage.height}`
+      );
 
-      // Create base canvas
-      const canvas = await sharp({
-        create: {
-          width: this.STITCHED_WIDTH,
-          height: this.STITCHED_HEIGHT,
-          channels: 3,
-          background: { r: 255, g: 255, b: 255 },
-        },
-      })
-        .png()
-        .toBuffer();
+      // Resize images to same height (preserving aspect ratios)
+      const { leftImage, rightImage, targetHeight } = await this.resizeImagesSameHeight(
+        mainImage,
+        diffImage
+      );
 
-      // Composite both images side-by-side
-      const stitchedWithoutText = await sharp(canvas)
-        .composite([
-          {
-            input: mainResized,
-            left: 0,
-            top: 0,
-          },
-          {
-            input: diffResized,
-            left: this.SINGLE_IMAGE_WIDTH,
-            top: 0,
-          },
-        ])
-        .png()
-        .toBuffer();
+      console.log(
+        `[ImageStitcher] Resized to same height: ${targetHeight}px (left=${leftImage.width}x${leftImage.height}, right=${rightImage.width}x${rightImage.height})`
+      );
 
-      // Add text overlay
-      const finalImage = await this.textOverlay.addTextOverlay({
-        imageBuffer: stitchedWithoutText,
-        width: this.STITCHED_WIDTH,
-        height: this.STITCHED_HEIGHT,
-        languageId,
-      });
+      // Create temporary canvas for line height measurement
+      const tempCanvas = createCanvas(100, 100);
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.font = `${fontSize}px ${fontFamily}`;
+
+      // Calculate line height
+      const lineHeight = getLineHeight(tempCtx, fontSize);
+
+      // Calculate header height (2 lines + padding)
+      const headerHeight = Math.ceil(lineHeight * 2 + this.config.pad);
+
+      // Calculate canvas dimensions
+      const canvasWidth = this.CANVAS_WIDTH;
+      const canvasHeight = headerHeight + targetHeight + this.config.pad;
+
+      console.log(
+        `[ImageStitcher] Canvas dimensions: ${canvasWidth}x${canvasHeight} (header=${headerHeight}px, images=${targetHeight}px)`
+      );
+
+      // Create final canvas
+      const canvas = createCanvas(canvasWidth, canvasHeight);
+      const ctx = canvas.getContext('2d');
+
+      // Fill background
+      ctx.fillStyle = this.config.bgColor;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Calculate half width
+      const halfWidth = canvasWidth / 2;
+
+      // Calculate image positions (centered within each half)
+      const leftImageX = (halfWidth - leftImage.width) / 2;
+      const rightImageX = halfWidth + (halfWidth - rightImage.width) / 2;
+      const imageY = headerHeight;
+
+      // Draw images
+      ctx.drawImage(leftImage, leftImageX, imageY, leftImage.width, leftImage.height);
+      ctx.drawImage(rightImage, rightImageX, imageY, rightImage.width, rightImage.height);
+
+      console.log(
+        `[ImageStitcher] Images placed at: left=(${leftImageX}, ${imageY}), right=(${rightImageX}, ${imageY})`
+      );
+
+      // Draw text overlays
+      const leftTextX = halfWidth / 2;
+      const rightTextX = halfWidth + halfWidth / 2;
+      const textY = this.config.pad;
+
+      // Draw left text
+      drawTwoLineCenteredText(
+        canvas,
+        ctx,
+        line1,
+        line2,
+        leftTextX,
+        textY,
+        fontSize,
+        fontFamily,
+        '#000000'
+      );
+
+      // Draw right text
+      drawTwoLineCenteredText(
+        canvas,
+        ctx,
+        line1,
+        line2,
+        rightTextX,
+        textY,
+        fontSize,
+        fontFamily,
+        '#000000'
+      );
+
+      console.log(`[ImageStitcher] Text overlays rendered`);
+
+      // Convert canvas to buffer
+      const buffer = canvas.toBuffer('image/png');
 
       // Save final image
-      await fs.writeFile(outputPath, finalImage);
+      await fs.writeFile(outputPath, buffer);
 
       console.log(`[ImageStitcher] ✅ Stitching complete: ${outputPath}`);
 
@@ -125,115 +217,152 @@ export class ImageStitcher {
   }
 
   /**
-   * Ensure image is the correct size (1440x2560, 9:16 aspect ratio)
-   * Resize if necessary to match old system behavior
+   * Resize images to same height while preserving aspect ratios
+   * Matches Python's resize_images_same_height function
+   *
+   * Algorithm:
+   * 1. Calculate target height = min(leftHeight, rightHeight)
+   * 2. Calculate new widths based on target height (preserving aspect ratios)
+   * 3. Resize both images to target height
+   *
+   * @param leftImage Left image (main)
+   * @param rightImage Right image (diff)
+   * @returns Resized images and target height
    */
-  private async ensureImageSize(
-    imageBuffer: Buffer,
-    label: string
-  ): Promise<Buffer> {
-    try {
-      const metadata = await sharp(imageBuffer).metadata();
+  private async resizeImagesSameHeight(
+    leftImage: Image,
+    rightImage: Image
+  ): Promise<{
+    leftImage: Image;
+    rightImage: Image;
+    targetHeight: number;
+  }> {
+    const leftWidth = leftImage.width;
+    const leftHeight = leftImage.height;
+    const rightWidth = rightImage.width;
+    const rightHeight = rightImage.height;
 
-      if (
-        metadata.width === this.SINGLE_IMAGE_WIDTH &&
-        metadata.height === this.SINGLE_IMAGE_HEIGHT
-      ) {
-        // Already correct size
-        return imageBuffer;
-      }
+    // Calculate target height (minimum of both heights)
+    const targetHeight = Math.min(leftHeight, rightHeight);
 
-      console.log(
-        `[ImageStitcher] Resizing ${label} image from ${metadata.width}x${metadata.height} to ${this.SINGLE_IMAGE_WIDTH}x${this.SINGLE_IMAGE_HEIGHT}`
-      );
+    // Calculate new widths (preserving aspect ratios)
+    const leftAspectRatio = leftWidth / leftHeight;
+    const rightAspectRatio = rightWidth / rightHeight;
 
-      // Resize to standard 9:16 size
-      return sharp(imageBuffer)
-        .resize(this.SINGLE_IMAGE_WIDTH, this.SINGLE_IMAGE_HEIGHT, {
-          fit: 'cover',
-          position: 'center',
-        })
-        .png()
-        .toBuffer();
-    } catch (error) {
-      throw new Error(
-        `Failed to process ${label} image: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
+    const newLeftWidth = Math.round(targetHeight * leftAspectRatio);
+    const newRightWidth = Math.round(targetHeight * rightAspectRatio);
 
-  /**
-   * Stitch images without text overlay (utility method)
-   */
-  async stitchWithoutText(
-    mainImagePath: string,
-    diffImagePath: string,
-    outputPath: string
-  ): Promise<string> {
     console.log(
-      `[ImageStitcher] Stitching without text: ${mainImagePath} + ${diffImagePath}`
+      `[ImageStitcher] Resizing to target height ${targetHeight}px: left=${newLeftWidth}x${targetHeight}, right=${newRightWidth}x${targetHeight}`
     );
 
-    try {
-      // Load both images
-      const [mainImageBuffer, diffImageBuffer] = await Promise.all([
-        fs.readFile(mainImagePath),
-        fs.readFile(diffImagePath),
-      ]);
-
-      // Verify and resize images
-      const [mainResized, diffResized] = await Promise.all([
-        this.ensureImageSize(mainImageBuffer, 'main'),
-        this.ensureImageSize(diffImageBuffer, 'diff'),
-      ]);
-
-      // Create base canvas
-      const canvas = await sharp({
-        create: {
-          width: this.STITCHED_WIDTH,
-          height: this.STITCHED_HEIGHT,
-          channels: 3,
-          background: { r: 255, g: 255, b: 255 },
-        },
+    // Resize left image
+    const leftBuffer = await sharp(leftImage.src as Buffer)
+      .resize(newLeftWidth, targetHeight, {
+        fit: 'fill',
+        kernel: sharp.kernel.lanczos3,
       })
-        .png()
-        .toBuffer();
+      .png()
+      .toBuffer();
 
-      // Composite both images
-      const stitched = await sharp(canvas)
-        .composite([
-          {
-            input: mainResized,
-            left: 0,
-            top: 0,
-          },
-          {
-            input: diffResized,
-            left: this.SINGLE_IMAGE_WIDTH,
-            top: 0,
-          },
-        ])
-        .png()
-        .toFile(outputPath);
+    // Resize right image
+    const rightBuffer = await sharp(rightImage.src as Buffer)
+      .resize(newRightWidth, targetHeight, {
+        fit: 'fill',
+        kernel: sharp.kernel.lanczos3,
+      })
+      .png()
+      .toBuffer();
 
-      console.log(`[ImageStitcher] ✅ Stitching complete (no text): ${outputPath}`);
+    // Load resized images
+    const resizedLeft = await loadImage(leftBuffer);
+    const resizedRight = await loadImage(rightBuffer);
 
-      return outputPath;
+    return {
+      leftImage: resizedLeft,
+      rightImage: resizedRight,
+      targetHeight,
+    };
+  }
+
+  /**
+   * Generate random integer between min and max (inclusive)
+   * Matches Python's random.randint(a, b)
+   */
+  private randomInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  /**
+   * Substitute template variables in text
+   *
+   * Variables:
+   * - {tries}: Random number of attempts (300-999)
+   * - {diffs}: Random number of differences (10-20)
+   *
+   * @param text Text with variables
+   * @param variables Variable values
+   * @returns Text with variables replaced
+   */
+  private substituteVariables(
+    text: string,
+    variables: { tries: number; diffs: number }
+  ): string {
+    return text
+      .replace(/\{tries\}/g, String(variables.tries))
+      .replace(/\{diffs\}/g, String(variables.diffs));
+  }
+
+  /**
+   * Stitch images with detailed result information
+   * Useful for testing and debugging
+   */
+  async stitchWithResult(options: StitchOptions): Promise<StitchResult> {
+    try {
+      const { languageId } = options;
+      const template = getLanguageTemplate(languageId);
+
+      // Generate random values
+      const tries = this.randomInt(this.config.triesMin, this.config.triesMax);
+      const diffs = this.randomInt(this.config.diffsMin, this.config.diffsMax);
+
+      // Perform stitching
+      const outputPath = await this.stitch(options);
+
+      // Get dimensions
+      const metadata = await sharp(outputPath).metadata();
+
+      return {
+        success: true,
+        outputPath,
+        language: template.name,
+        tries,
+        diffs,
+        dimensions: {
+          width: metadata.width || 0,
+          height: metadata.height || 0,
+        },
+      };
     } catch (error) {
-      console.error('[ImageStitcher] Stitching failed:', error);
-      throw new Error(
-        `Failed to stitch images: ${error instanceof Error ? error.message : String(error)}`
-      );
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        stage: 'stitch',
+      };
     }
   }
 
   /**
-   * Get stitched image dimensions
+   * Get current configuration
    */
-  getDimensions(): { width: number; height: number } {
-    return {
-      width: this.STITCHED_WIDTH,
-      height: this.STITCHED_HEIGHT,
-    };
+  getConfig(): StitchConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * Update configuration
+   */
+  updateConfig(config: Partial<StitchConfig>): void {
+    this.config = { ...this.config, ...config };
   }
 }

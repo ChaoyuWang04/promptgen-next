@@ -32,7 +32,9 @@ interface BytedanceGenerateResponse {
 
 /**
  * ByteDance Doubao Provider implementation
- * Follows old Flask system's implementation pattern
+ * Follows old Flask system's implementation pattern exactly:
+ * - Round 1: Generate main image, save returned URL
+ * - Round 2: Use saved URL as context image (not base64/data URI)
  */
 export class BytedanceProvider implements IImageProvider {
   public readonly name = 'bytedance';
@@ -42,8 +44,12 @@ export class BytedanceProvider implements IImageProvider {
   private readonly size: string;
   private readonly watermark: boolean;
 
-  // Strategy flags
-  private dataUriSupported: boolean | null = null; // null = not tested yet
+  /**
+   * Stores Round 1 generated image URL for use in Round 2
+   * This is safe in sequential execution mode (like old Python system)
+   * Key insight: ByteDance API works better with its own URLs than with base64
+   */
+  private _lastGeneratedUrl: string | null = null;
 
   constructor(apiKey: string, model?: string, baseUrl?: string) {
     if (!apiKey) {
@@ -58,20 +64,25 @@ export class BytedanceProvider implements IImageProvider {
 
   /**
    * Generate an image using ByteDance Ark API
-   * Matches old system: Round 1 gets URL, Round 2 uses that URL as reference
+   * Matches old Python system exactly:
+   * - Round 1 (contextImage=undefined): Generate main image, save URL
+   * - Round 2 (contextImage=Buffer): Use saved URL as context (ignores buffer content)
    */
   async generate(prompt: string, contextImage?: Buffer): Promise<Buffer> {
     const startTime = Date.now();
+    const isRound2 = contextImage !== undefined;
 
     try {
       const endpoint = `${this.baseUrl}/images/generate`;
 
       // Build request payload
-      const payload = await this.buildPayload(prompt, contextImage);
+      const payload = this.buildPayload(prompt, isRound2);
 
       console.log(`[ByteDance] Calling API: ${endpoint}`);
-      if (contextImage) {
-        console.log(`[ByteDance] Round 2 generation with context image`);
+      if (isRound2) {
+        console.log(`[ByteDance] Round 2 generation with context URL: ${this._lastGeneratedUrl?.substring(0, 80)}...`);
+      } else {
+        console.log(`[ByteDance] Round 1 generation (main image)`);
       }
 
       // Make API request
@@ -89,14 +100,26 @@ export class BytedanceProvider implements IImageProvider {
 
       // Check for API errors
       if (response.data.error) {
+        // On error, clear saved URL
+        this._lastGeneratedUrl = null;
         throw new ProviderError(
           `ByteDance API error: ${response.data.error.message}`,
           this.name
         );
       }
 
-      // Extract image from response
-      const imageBuffer = await this.extractImage(response.data);
+      // Extract image from response and handle URL storage
+      const { imageBuffer, imageUrl } = await this.extractImageWithUrl(response.data);
+
+      // Round 1: Save URL for Round 2
+      if (!isRound2) {
+        this._lastGeneratedUrl = imageUrl;
+        console.log(`[ByteDance] Saved URL for Round 2`);
+      } else {
+        // Round 2 completed, clear URL cache
+        this._lastGeneratedUrl = null;
+        console.log(`[ByteDance] Round 2 completed, cleared URL cache`);
+      }
 
       const generationTimeMs = Date.now() - startTime;
       console.log(
@@ -106,6 +129,8 @@ export class BytedanceProvider implements IImageProvider {
       return imageBuffer;
     } catch (error) {
       const generationTimeMs = Date.now() - startTime;
+      // Clear URL on any error
+      this._lastGeneratedUrl = null;
       console.error(
         `[ByteDance] Generation failed after ${generationTimeMs}ms:`,
         error
@@ -139,12 +164,14 @@ export class BytedanceProvider implements IImageProvider {
 
   /**
    * Build request payload for ByteDance Ark API
-   * Matches old Python system's payload structure
+   * Matches old Python system's payload structure exactly:
+   * - Round 1: No image parameter
+   * - Round 2: Uses saved URL from Round 1 (not base64)
    */
-  private async buildPayload(
+  private buildPayload(
     prompt: string,
-    contextImage?: Buffer
-  ): Promise<Record<string, unknown>> {
+    isRound2: boolean
+  ): Record<string, unknown> {
     const payload: Record<string, unknown> = {
       model: this.model,
       prompt: prompt,
@@ -153,50 +180,28 @@ export class BytedanceProvider implements IImageProvider {
       watermark: this.watermark,
     };
 
-    // Round 2: Add context image
-    if (contextImage) {
-      // Strategy 1: Try data URI (user's preferred approach)
-      // Strategy 2: Fallback to URL upload if data URI fails
-      const contextImageRef = await this.prepareContextImage(contextImage);
-      payload.image = [contextImageRef]; // ByteDance expects array
+    // Round 2: Add context image URL (matches old Python system exactly)
+    if (isRound2 && this._lastGeneratedUrl) {
+      // Use ByteDance's own URL from Round 1 - this is the key insight
+      // ByteDance API works much better with its own URLs than with base64
+      payload.image = [this._lastGeneratedUrl];
+      console.log(`[ByteDance] Using saved URL as context image`);
+    } else if (isRound2 && !this._lastGeneratedUrl) {
+      console.warn(`[ByteDance] Round 2 requested but no saved URL available`);
+      // Continue without context image - API may fail but that's expected
     }
 
     return payload;
   }
 
   /**
-   * Prepare context image for Round 2
-   * Tests data URI support, falls back to URL upload if needed
+   * Extract image buffer and URL from ByteDance Ark API response
+   * Matches old Python system: downloads from URL and returns both
    */
-  private async prepareContextImage(buffer: Buffer): Promise<string> {
-    // Test data URI on first Round 2 generation
-    if (this.dataUriSupported === null) {
-      console.log('[ByteDance] Testing data URI support...');
-      // For first attempt, try data URI
-      this.dataUriSupported = true; // Optimistic
-      const dataUri = `data:image/png;base64,${buffer.toString('base64')}`;
-      console.log(`[ByteDance] Using data URI (length: ${dataUri.length})`);
-      return dataUri;
-    }
-
-    // Use known working strategy
-    if (this.dataUriSupported) {
-      const dataUri = `data:image/png;base64,${buffer.toString('base64')}`;
-      return dataUri;
-    } else {
-      // TODO: Implement URL upload fallback
-      throw new ProviderError(
-        'Data URI not supported and URL upload not implemented yet',
-        this.name
-      );
-    }
-  }
-
-  /**
-   * Extract image buffer from ByteDance Ark API response
-   * Matches old Python system: downloads from URL
-   */
-  private async extractImage(response: BytedanceGenerateResponse): Promise<Buffer> {
+  private async extractImageWithUrl(response: BytedanceGenerateResponse): Promise<{
+    imageBuffer: Buffer;
+    imageUrl: string;
+  }> {
     // Check for data array
     if (!response.data || response.data.length === 0) {
       throw new ProviderError('No data in ByteDance API response', this.name);
@@ -220,7 +225,10 @@ export class BytedanceProvider implements IImageProvider {
       });
 
       console.log('[ByteDance] Image downloaded successfully');
-      return Buffer.from(downloadResponse.data);
+      return {
+        imageBuffer: Buffer.from(downloadResponse.data),
+        imageUrl: imageUrl, // Return URL for Round 2 usage
+      };
     } catch (error) {
       throw new ProviderError(
         `Failed to download image from URL: ${error instanceof Error ? error.message : String(error)}`,

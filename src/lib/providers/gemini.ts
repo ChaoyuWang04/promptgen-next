@@ -13,19 +13,27 @@ import {
 
 /**
  * Gemini API response structure for image generation
+ * Supports both camelCase (REST API standard) and snake_case (some API versions)
  */
 interface GeminiGenerateContentResponse {
   candidates: Array<{
     content: {
       parts: Array<{
         text?: string;
+        // camelCase format
         inlineData?: {
           mimeType: string;
           data: string; // Base64 encoded image
         };
+        // snake_case format (some API versions)
+        inline_data?: {
+          mime_type: string;
+          data: string;
+        };
       }>;
     };
     finishReason?: string;
+    finish_reason?: string;
     safetyRatings?: Array<{
       category: string;
       probability: string;
@@ -68,9 +76,16 @@ export class GeminiProvider implements IImageProvider {
 
     try {
       const endpoint = `${this.baseUrl}/models/${this.model}:generateContent`;
+      console.log(`[Gemini] Calling endpoint: ${endpoint}`);
+      console.log(`[Gemini] Model: ${this.model}, aspectRatio: ${this.aspectRatio}`);
 
       // Build request payload
       const payload = this.buildPayload(prompt, contextImage);
+      console.log(`[Gemini] Payload config:`, JSON.stringify({
+        contentsCount: (payload.contents as any[]).length,
+        hasContextImage: !!contextImage,
+        generationConfig: payload.generationConfig,
+      }, null, 2));
 
       // Make API request
       const response = await axios.post<GeminiGenerateContentResponse>(
@@ -84,6 +99,23 @@ export class GeminiProvider implements IImageProvider {
           timeout: PROVIDER_TIMEOUT.GEMINI,
         }
       );
+
+      // Debug: log response structure (check both formats)
+      console.log('[Gemini] Response structure:', JSON.stringify({
+        hasCandidates: !!response.data.candidates,
+        candidatesCount: response.data.candidates?.length,
+        firstCandidateParts: response.data.candidates?.[0]?.content?.parts?.map(p => ({
+          hasText: !!p.text,
+          textPreview: p.text?.substring(0, 100),
+          // Check both camelCase and snake_case
+          hasInlineData: !!p.inlineData,
+          mimeType_camel: p.inlineData?.mimeType,
+          hasInline_data: !!(p as any).inline_data,
+          mime_type_snake: (p as any).inline_data?.mime_type,
+        })),
+        finishReason: response.data.candidates?.[0]?.finishReason || (response.data.candidates?.[0] as any)?.finish_reason,
+        promptFeedback: response.data.promptFeedback,
+      }, null, 2));
 
       // Extract image from response
       const imageBuffer = this.extractImage(response.data);
@@ -165,13 +197,12 @@ export class GeminiProvider implements IImageProvider {
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 8192,
-        responseModalities: ['image'],
-      },
-      // TODO: Verify correct REST API format for aspect_ratio
-      // Python SDK uses: ImageConfig(aspect_ratio='9:16')
-      // REST API format may differ - needs testing
-      imageConfig: {
-        aspectRatio: this.aspectRatio, // e.g., '9:16'
+        responseModalities: ['TEXT', 'IMAGE'],
+        // imageConfig must be inside generationConfig for REST API
+        // (different from Python SDK which has separate ImageConfig)
+        imageConfig: {
+          aspectRatio: this.aspectRatio, // e.g., '9:16'
+        },
       },
     };
   }
@@ -195,26 +226,37 @@ export class GeminiProvider implements IImageProvider {
 
     const candidate = response.candidates[0];
 
-    // Check finish reason
-    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+    // Check finish reason (handle both camelCase and snake_case)
+    const finishReason = candidate.finishReason || candidate.finish_reason;
+    if (finishReason && finishReason !== 'STOP') {
       throw new ProviderError(
-        `Generation stopped: ${candidate.finishReason}`,
+        `Generation stopped: ${finishReason}`,
         this.name
       );
     }
 
-    // Find image data in response parts
-    const imagePart = candidate.content.parts.find(
-      (part) => part.inlineData?.mimeType?.startsWith('image/')
-    );
+    // Find image data in response parts (handle both camelCase and snake_case)
+    const imagePart = candidate.content.parts.find((part) => {
+      // Check camelCase format
+      if (part.inlineData?.mimeType?.startsWith('image/')) return true;
+      // Check snake_case format
+      if (part.inline_data?.mime_type?.startsWith('image/')) return true;
+      return false;
+    });
 
-    if (!imagePart || !imagePart.inlineData) {
+    if (!imagePart) {
       throw new ProviderError('No image data in response', this.name);
+    }
+
+    // Get image data from either format
+    const imageData = imagePart.inlineData || imagePart.inline_data;
+    if (!imageData?.data) {
+      throw new ProviderError('Image data is empty', this.name);
     }
 
     // Decode base64 image
     try {
-      return Buffer.from(imagePart.inlineData.data, 'base64');
+      return Buffer.from(imageData.data, 'base64');
     } catch (error) {
       throw new ProviderError(
         'Failed to decode image data',

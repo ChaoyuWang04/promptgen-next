@@ -11,6 +11,79 @@ import { type DiffTemplateContext, type DiffPromptGenerationResult } from '../en
 import { generateOutfitChanges, selectRandomDecorations } from '../utils/random';
 
 /**
+ * Default color pool for outfit color changes
+ */
+const DEFAULT_COLOR_POOL = ['红色', '蓝色', '绿色', '黄色', '粉色', '紫色', '橙色', '白色', '黑色', '灰色'];
+
+/**
+ * Normalize outfit_minor data to expected format
+ * Handles both old format (object array) and simple format (string array)
+ */
+function normalizeOutfitMinor(
+  data: unknown
+): Array<{
+  element: string;
+  original_color: string;
+  color_pool: string[];
+  description_template?: string;
+}> {
+  if (!Array.isArray(data) || data.length === 0) {
+    return [];
+  }
+
+  // Check if it's already in the correct format (object array)
+  const firstItem = data[0];
+  if (typeof firstItem === 'object' && firstItem !== null && 'element' in firstItem) {
+    return data as Array<{
+      element: string;
+      original_color: string;
+      color_pool: string[];
+      description_template?: string;
+    }>;
+  }
+
+  // Convert simple string array format to object format
+  // e.g., "红色平底鞋" -> {element: "平底鞋", original_color: "红色", color_pool: [...]}
+  return (data as string[]).map(item => {
+    // Try to extract color from the beginning of the string
+    const colorMatch = item.match(/^(红色|蓝色|绿色|黄色|粉色|紫色|橙色|白色|黑色|灰色|棕色|米色)/);
+    const originalColor = colorMatch ? colorMatch[1] : '原色';
+    const element = colorMatch ? item.slice(colorMatch[1].length) : item;
+
+    return {
+      element,
+      original_color: originalColor,
+      color_pool: DEFAULT_COLOR_POOL.filter(c => c !== originalColor),
+      description_template: `{color}${element}`,
+    };
+  });
+}
+
+/**
+ * Normalize decorative_props data to expected format
+ * Handles both old format (object array) and simple format (string array)
+ */
+function normalizeDecorations(
+  data: unknown
+): Array<{ name: string; priority?: string }> {
+  if (!Array.isArray(data) || data.length === 0) {
+    return [];
+  }
+
+  // Check if it's already in the correct format (object array)
+  const firstItem = data[0];
+  if (typeof firstItem === 'object' && firstItem !== null && 'name' in firstItem) {
+    return data as Array<{ name: string; priority?: string }>;
+  }
+
+  // Convert simple string array format to object format
+  return (data as string[]).map((item, index) => ({
+    name: item,
+    priority: index < 3 ? 'high' : 'low', // First 3 items are high priority
+  }));
+}
+
+/**
  * Load record by image ID
  */
 async function loadRecord(imageId: string): Promise<any> {
@@ -178,12 +251,23 @@ export async function generateDiffPrompt(
   const character = await loadLibraryEntry('character', libraryIds.character);
   const theme = await loadLibraryEntry('theme', libraryIds.theme);
 
+  // Normalize outfit_minor data format
+  // Old format: [{element, original_color, color_pool}]
+  // Simple format: ["红色平底鞋", ...] (string array)
+  const rawOutfitMinor = character.outfit_minor || [];
+  const normalizedOutfitMinor = normalizeOutfitMinor(rawOutfitMinor);
+
   // Generate 3 outfit color changes
-  const outfitChanges = generateOutfitChanges(character.outfit_minor || [], 3);
+  const outfitChanges = generateOutfitChanges(normalizedOutfitMinor, 3);
+
+  // Normalize decorative_props data format
+  // Old format: [{name, priority}]
+  // Simple format: ["遮阳伞", ...] (string array)
+  const rawDecorations = theme.decorative_props || [];
+  const normalizedDecorations = normalizeDecorations(rawDecorations);
 
   // Generate 8-9 decoration additions
-  const themeDecorations = theme.decorative_props || [];
-  const newDecorations = selectRandomDecorations(themeDecorations, [], 8);
+  const newDecorations = selectRandomDecorations(normalizedDecorations, [], 8);
 
   // Build context
   const context = await buildDiffContext(record, outfitChanges, newDecorations);

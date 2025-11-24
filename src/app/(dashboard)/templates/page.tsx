@@ -5,8 +5,9 @@
  * Interface for creating and editing prompt templates
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import type * as Monaco from 'monaco-editor';
 import {
   useTemplates,
   useTemplateVariables,
@@ -17,6 +18,7 @@ import {
   type Template,
 } from '@/hooks/use-templates';
 import { useLibraryConfig, useLibrary } from '@/hooks/use-libraries';
+import { createTemplateAutocomplete } from '@/lib/monaco/template-autocomplete';
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,7 +75,7 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 export default function TemplatesPage() {
   const { toast } = useToast();
   const { data: templates, isLoading: templatesLoading } = useTemplates();
-  const { data: variables, isLoading: variablesLoading } = useTemplateVariables('main');
+  const { data: variables, isLoading: variablesLoading } = useTemplateVariables('MAIN');
   const { data: config } = useLibraryConfig();
   const previewMutation = usePreviewTemplate();
   const createMutation = useCreateTemplate();
@@ -97,6 +99,42 @@ export default function TemplatesPage() {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateCategory, setNewTemplateCategory] = useState<'MAIN' | 'DIFF'>('MAIN');
   const [newTemplateDescription, setNewTemplateDescription] = useState('');
+
+  // Monaco editor instance and autocomplete disposable refs
+  const monacoRef = useRef<typeof Monaco | null>(null);
+  const autocompleteDisposableRef = useRef<Monaco.IDisposable | null>(null);
+  const [monacoReady, setMonacoReady] = useState(false);
+
+  // Handle Monaco editor mount - store monaco instance and trigger state update
+  const handleEditorMount = (editor: Monaco.editor.IStandaloneCodeEditor, monaco: typeof Monaco) => {
+    monacoRef.current = monaco;
+    setMonacoReady(true); // Trigger useEffect to register autocomplete
+  };
+
+  // Register/update autocomplete when variables data changes OR monaco becomes ready
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco || !monacoReady || !variables?.variables) {
+      return;
+    }
+
+    // Dispose previous registration if exists
+    if (autocompleteDisposableRef.current) {
+      autocompleteDisposableRef.current.dispose();
+    }
+
+    // Register autocomplete with dynamic variables from API
+    autocompleteDisposableRef.current = createTemplateAutocomplete(monaco, variables.variables);
+  }, [variables?.variables, monacoReady]);
+
+  // Cleanup autocomplete on unmount
+  useEffect(() => {
+    return () => {
+      if (autocompleteDisposableRef.current) {
+        autocompleteDisposableRef.current.dispose();
+      }
+    };
+  }, []);
 
   // Get currently selected template object
   const currentTemplate = templates?.find((t) => t.id === selectedTemplate);
@@ -310,13 +348,14 @@ export default function TemplatesPage() {
   const handlePreview = async () => {
     if (!editorContent || !config) return;
 
-    const requiredLibs = config.enabled_libraries.filter((lib) => lib.type === 'required');
-    const allSelected = requiredLibs.every((lib) => previewSelections[lib.name]);
+    // Check that all 5 core libraries are selected
+    const coreLibraries = ['character', 'pose', 'scene', 'theme', 'style'];
+    const missingLibraries = coreLibraries.filter((lib) => !previewSelections[lib]);
 
-    if (!allSelected) {
+    if (missingLibraries.length > 0) {
       toast({
         title: '请选择所有必需的库',
-        description: '预览需要选择所有必需的库元素',
+        description: `缺少: ${missingLibraries.join(', ')}`,
         variant: 'destructive',
       });
       return;
@@ -324,12 +363,11 @@ export default function TemplatesPage() {
 
     try {
       const result = await previewMutation.mutateAsync({
-        template_content: editorContent,
+        content: editorContent,
         library_ids: previewSelections,
-        type: currentTemplate?.category || 'MAIN',
       });
 
-      setPreviewResult(result.prompt_cn);
+      setPreviewResult(result.rendered);
     } catch (error) {
       // Error toast handled by mutation
     }
@@ -486,11 +524,14 @@ export default function TemplatesPage() {
                 defaultLanguage="plaintext"
                 value={editorContent}
                 onChange={(value) => setEditorContent(value || '')}
+                onMount={handleEditorMount}
                 options={{
                   minimap: { enabled: false },
                   lineNumbers: 'on',
                   wordWrap: 'on',
                   fontSize: 14,
+                  quickSuggestions: true,
+                  suggestOnTriggerCharacters: true,
                 }}
                 theme="vs-dark"
               />
@@ -543,10 +584,10 @@ export default function TemplatesPage() {
           <CardDescription>选择库元素查看渲染结果</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Library Selectors for Preview */}
+          {/* Library Selectors for Preview - show the 5 core libraries needed for template rendering */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {config?.enabled_libraries
-              .filter((lib) => lib.type === 'required')
+              .filter((lib) => ['character', 'pose', 'scene', 'theme', 'style'].includes(lib.name))
               .sort((a, b) => a.order - b.order)
               .map((lib) => (
                 <LibraryPreviewSelector
