@@ -3,9 +3,12 @@
 /**
  * Combinations Management Page
  * Two-panel layout: combination list on left, detail panel on right
+ * Features:
+ * - Infinite scroll list
+ * - Batch delete with selection mode
  */
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,8 +20,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Layers, Filter } from 'lucide-react';
-import { useCombinations, useCombination } from '@/hooks/use-combinations';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Plus, Search, Layers, Filter, Trash2, X, CheckSquare } from 'lucide-react';
+import {
+  useInfiniteCombinations,
+  useCombination,
+  useDeleteCombinationsBatch,
+} from '@/hooks/use-combinations';
 import { useTemplates } from '@/hooks/use-templates';
 import { CombinationList } from '@/components/combinations/combination-list';
 import { CombinationDetail } from '@/components/combinations/combination-detail';
@@ -29,20 +48,25 @@ export default function CombinationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [templateFilter, setTemplateFilter] = useState<string>('');
-  const [page, setPage] = useState(1);
   const [isStrategyDialogOpen, setIsStrategyDialogOpen] = useState(false);
+
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Queries
   const { data: templates } = useTemplates();
 
   const {
-    data: listData,
+    data: infiniteData,
     isLoading: isListLoading,
     error: listError,
-  } = useCombinations({
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteCombinations({
     mainTemplateId: templateFilter || undefined,
     search: search || undefined,
-    page,
     pageSize: 20,
   });
 
@@ -50,6 +74,71 @@ export default function CombinationsPage() {
     data: selectedCombination,
     isLoading: isDetailLoading,
   } = useCombination(selectedId);
+
+  // Batch delete mutation
+  const batchDeleteMutation = useDeleteCombinationsBatch();
+
+  // Flatten all combinations from infinite query pages
+  const allCombinations = useMemo(() => {
+    if (!infiniteData?.pages) return [];
+    return infiniteData.pages.flatMap((page) => page.combinations);
+  }, [infiniteData?.pages]);
+
+  // Get total count from first page
+  const totalCount = infiniteData?.pages?.[0]?.total || 0;
+
+  // All combination IDs for select all
+  const allIds = useMemo(() => {
+    return allCombinations.filter((c) => c.id).map((c) => c.id!);
+  }, [allCombinations]);
+
+  // Selection handlers
+  const handleSelectionChange = useCallback((id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(id);
+      } else {
+        newSet.delete(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(allIds));
+  }, [allIds]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleToggleSelectionMode = useCallback(() => {
+    if (selectionMode) {
+      // Exiting selection mode - clear selections
+      setSelectedIds(new Set());
+    }
+    setSelectionMode((prev) => !prev);
+  }, [selectionMode]);
+
+  const handleBatchDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    await batchDeleteMutation.mutateAsync(ids);
+
+    // Clear selection after delete
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+
+    // If currently selected item was deleted, clear detail view
+    if (selectedId && selectedIds.has(selectedId)) {
+      setSelectedId(null);
+    }
+  }, [selectedIds, batchDeleteMutation, selectedId]);
+
+  // Check if all loaded items are selected
+  const isAllSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
 
   return (
     <div className="flex h-full flex-col">
@@ -77,10 +166,7 @@ export default function CombinationsPage() {
               <Input
                 placeholder="搜索组合..."
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
@@ -95,7 +181,6 @@ export default function CombinationsPage() {
                 value={templateFilter || 'all'}
                 onValueChange={(value) => {
                   setTemplateFilter(value === 'all' ? '' : value);
-                  setPage(1);
                 }}
               >
                 <SelectTrigger>
@@ -121,14 +206,100 @@ export default function CombinationsPage() {
             </div>
           </div>
 
-          {/* Stats */}
-          {listData && (
-            <div className="border-b p-4">
+          {/* Stats & Batch Actions */}
+          <div className="border-b p-4 space-y-3">
+            {/* Stats row */}
+            <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                共 {listData.total} 个组合
+                共 {totalCount} 个组合
+                {allCombinations.length < totalCount && (
+                  <span> (已加载 {allCombinations.length})</span>
+                )}
               </p>
+              <Button
+                variant={selectionMode ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={handleToggleSelectionMode}
+              >
+                {selectionMode ? (
+                  <>
+                    <X className="mr-1.5 h-3.5 w-3.5" />
+                    退出选择
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
+                    批量选择
+                  </>
+                )}
+              </Button>
             </div>
-          )}
+
+            {/* Selection mode actions */}
+            {selectionMode && (
+              <div className="flex items-center gap-2">
+                {/* Select all checkbox */}
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        handleSelectAll();
+                      } else {
+                        handleDeselectAll();
+                      }
+                    }}
+                  />
+                  <span className="text-sm">
+                    {isAllSelected ? '取消全选' : '全选'}
+                  </span>
+                </div>
+
+                {/* Selection count */}
+                {selectedIds.size > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    已选 {selectedIds.size}
+                  </Badge>
+                )}
+
+                {/* Batch delete button */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={selectedIds.size === 0 || batchDeleteMutation.isPending}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      删除
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        您确定要删除选中的 {selectedIds.size} 个组合吗？
+                        <br />
+                        <br />
+                        <span className="text-destructive font-medium">
+                          这将同时删除所有相关的变体记录、Prompt 和生成的图片文件。此操作无法撤销。
+                        </span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleBatchDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        确认删除 ({selectedIds.size})
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
 
           {/* List */}
           <div className="flex-1 overflow-auto">
@@ -142,39 +313,18 @@ export default function CombinationsPage() {
               </div>
             ) : (
               <CombinationList
-                combinations={listData?.combinations || []}
+                combinations={allCombinations}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
+                selectionMode={selectionMode}
+                selectedIds={selectedIds}
+                onSelectionChange={handleSelectionChange}
+                hasNextPage={hasNextPage}
+                isFetchingNextPage={isFetchingNextPage}
+                onLoadMore={() => fetchNextPage()}
               />
             )}
           </div>
-
-          {/* Pagination */}
-          {listData && listData.totalPages > 1 && (
-            <div className="flex items-center justify-between border-t p-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                上一页
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {page} / {listData.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setPage((p) => Math.min(listData.totalPages, p + 1))
-                }
-                disabled={page === listData.totalPages}
-              >
-                下一页
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Right Panel - Detail */}

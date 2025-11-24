@@ -2,7 +2,7 @@
  * React Query Hooks for Combination Management
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import type {
   Combination,
@@ -396,6 +396,107 @@ export function usePreviewCombinations() {
         }
       );
       return response.data!;
+    },
+  });
+}
+
+// ========================================
+// Infinite Scroll Hook
+// ========================================
+
+interface InfiniteCombinationsFilters {
+  mainTemplateId?: string;
+  diffTemplateId?: string;
+  search?: string;
+  pageSize?: number;
+  libraryFilters?: Record<string, string>;
+}
+
+/**
+ * Hook to fetch combinations with infinite scroll support
+ */
+export function useInfiniteCombinations(filters: InfiniteCombinationsFilters = {}) {
+  const pageSize = filters.pageSize || 20;
+
+  return useInfiniteQuery({
+    queryKey: [...combinationKeys.lists(), 'infinite', filters],
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = new URLSearchParams();
+
+      if (filters.mainTemplateId) params.set('mainTemplateId', filters.mainTemplateId);
+      if (filters.diffTemplateId) params.set('diffTemplateId', filters.diffTemplateId);
+      if (filters.search) params.set('search', filters.search);
+      params.set('page', String(pageParam));
+      params.set('pageSize', String(pageSize));
+
+      // Add library filters
+      if (filters.libraryFilters) {
+        for (const [key, value] of Object.entries(filters.libraryFilters)) {
+          params.set(`library_${key}`, value);
+        }
+      }
+
+      const url = `${API_BASE}?${params.toString()}`;
+      const response = await fetchApi<CombinationListResponse>(url);
+      return {
+        ...response.data!,
+        page: pageParam,
+      };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page < lastPage.totalPages) {
+        return lastPage.page + 1;
+      }
+      return undefined;
+    },
+  });
+}
+
+// ========================================
+// Batch Delete Hook
+// ========================================
+
+interface BatchDeleteResponse {
+  deletedCount: number;
+  deletedKeys: string[];
+}
+
+/**
+ * Hook to batch delete multiple combinations
+ */
+export function useDeleteCombinationsBatch() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const response = await fetchApi<BatchDeleteResponse>(
+        `${API_BASE}/batch`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ ids }),
+        }
+      );
+      return response.data!;
+    },
+    onSuccess: (data) => {
+      // Invalidate all combination lists (including infinite queries)
+      queryClient.invalidateQueries({
+        queryKey: combinationKeys.lists(),
+      });
+
+      toast({
+        title: '批量删除成功',
+        description: `已删除 ${data.deletedCount} 个组合`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '批量删除失败',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 }
