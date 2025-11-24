@@ -26,6 +26,7 @@ import {
   Trash2,
   Loader2,
   Calendar,
+  FileCode,
 } from 'lucide-react';
 import {
   useGenerateVariant,
@@ -119,6 +120,49 @@ export function CombinationDetail({ combination }: CombinationDetailProps) {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {/* Template Info */}
+      {combination.template && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileCode className="h-5 w-5" />
+              生成模板
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">基于</span>
+              <Badge
+                variant={combination.template.category === 'MAIN' ? 'default' : 'secondary'}
+              >
+                {combination.template.category}
+              </Badge>
+              <span className="font-medium">{combination.template.name}</span>
+              <span className="text-sm text-muted-foreground">模板生成</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!combination.template && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileCode className="h-5 w-5" />
+              生成模板
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">未关联模板</Badge>
+              <span className="text-sm text-muted-foreground">
+                该组合未通过策略生成，或关联的模板已被删除
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Combination Info */}
       <Card>

@@ -148,6 +148,16 @@ export const CombinationWithRecordsSchema = CombinationSchema.extend({
 });
 
 // ========================================
+// Template Info Schema (for relations)
+// ========================================
+
+export const TemplateInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.enum(['MAIN', 'DIFF']),
+}).nullable();
+
+// ========================================
 // Combination List Response Schema
 // ========================================
 
@@ -156,6 +166,7 @@ export const CombinationListResponseSchema = z.object({
     _count: z.object({
       records: z.number(),
     }).optional(),
+    template: TemplateInfoSchema,
   })),
   total: z.number(),
   page: z.number(),

@@ -15,6 +15,11 @@ interface CombinationItem {
   _count?: {
     records: number;
   };
+  template?: {
+    id: string;
+    name: string;
+    category: 'MAIN' | 'DIFF';
+  } | null;
   createdAt?: Date | string;
 }
 
@@ -49,11 +54,30 @@ export function CombinationList({
           )}
         >
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-1.5">
               <p className="font-medium truncate">{combo.combinationKey}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {Object.keys(combo.libraryIds).length} 个库元素
-              </p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{Object.keys(combo.libraryIds).length} 个库元素</span>
+                {combo.template && (
+                  <>
+                    <span>·</span>
+                    <Badge
+                      variant={combo.template.category === 'MAIN' ? 'default' : 'secondary'}
+                      className="text-xs h-5"
+                    >
+                      {combo.template.name}
+                    </Badge>
+                  </>
+                )}
+                {!combo.template && (
+                  <>
+                    <span>·</span>
+                    <Badge variant="outline" className="text-xs h-5">
+                      未关联模板
+                    </Badge>
+                  </>
+                )}
+              </div>
             </div>
             {combo._count && combo._count.records > 0 && (
               <Badge variant="secondary" className="ml-2 shrink-0">

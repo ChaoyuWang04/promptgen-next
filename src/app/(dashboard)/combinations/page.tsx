@@ -9,8 +9,17 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Layers } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Search, Layers, Filter } from 'lucide-react';
 import { useCombinations, useCombination } from '@/hooks/use-combinations';
+import { useTemplates } from '@/hooks/use-templates';
 import { CombinationList } from '@/components/combinations/combination-list';
 import { CombinationDetail } from '@/components/combinations/combination-detail';
 import { StrategyGenerationDialog } from '@/components/combinations/strategy-generation-dialog';
@@ -19,15 +28,19 @@ export default function CombinationsPage() {
   // State
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [templateFilter, setTemplateFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [isStrategyDialogOpen, setIsStrategyDialogOpen] = useState(false);
 
   // Queries
+  const { data: templates } = useTemplates();
+
   const {
     data: listData,
     isLoading: isListLoading,
     error: listError,
   } = useCombinations({
+    templateId: templateFilter || undefined,
     search: search || undefined,
     page,
     pageSize: 20,
@@ -56,8 +69,9 @@ export default function CombinationsPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Combination List */}
         <div className="flex w-80 flex-col border-r">
-          {/* Search */}
-          <div className="border-b p-4">
+          {/* Filters */}
+          <div className="border-b p-4 space-y-3">
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -69,6 +83,41 @@ export default function CombinationsPage() {
                 }}
                 className="pl-9"
               />
+            </div>
+
+            {/* Template Filter */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                按模板筛选
+              </label>
+              <Select
+                value={templateFilter || 'all'}
+                onValueChange={(value) => {
+                  setTemplateFilter(value === 'all' ? '' : value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="全部模板" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部模板</SelectItem>
+                  {templates?.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={template.category === 'MAIN' ? 'default' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {template.category}
+                        </Badge>
+                        <span>{template.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

@@ -23,6 +23,7 @@ model Combination {
 
   // 模板和策略配置
   templateId      String?  // 关联的模板ID
+  template        Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   strategyConfig  Json?    // 策略配置: {"fixed": ["character"], "variable": ["theme", "scene"]}
 
   // 关联关系
@@ -152,15 +153,18 @@ model ImageVariant {
 // 模板表
 // ========================================
 model Template {
-  id          String           @id @default(cuid())
-  name        String           @unique  // template_default_v1, user_custom_template
-  description String?
-  type        TemplateType     // SYSTEM 或 USER
-  category    TemplateCategory // MAIN 或 DIFF
-  content     String           @db.Text  // 模板内容（可能很长）
+  id           String           @id @default(cuid())
+  name         String           @unique  // template_default_v1, user_custom_template
+  description  String?
+  type         TemplateType     // SYSTEM 或 USER
+  category     TemplateCategory // MAIN 或 DIFF
+  content      String           @db.Text  // 模板内容（可能很长）
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // 关联关系
+  combinations Combination[]    // 使用此模板的组合
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([type, category])
 }

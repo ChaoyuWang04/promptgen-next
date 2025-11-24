@@ -83,12 +83,19 @@ export async function GET(request: NextRequest) {
     // Get total count
     const total = await prisma.combination.count({ where });
 
-    // Get combinations with record counts
+    // Get combinations with record counts and template info
     const combinations = await prisma.combination.findMany({
       where,
       include: {
         _count: {
           select: { records: true },
+        },
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -203,6 +210,13 @@ export async function POST(request: NextRequest) {
       include: {
         _count: {
           select: { records: true },
+        },
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+          },
         },
       },
     });
