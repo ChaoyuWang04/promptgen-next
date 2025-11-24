@@ -33,6 +33,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { useLibraryTemplates, useCreateLibrary, type LibraryTemplate } from '@/hooks/use-libraries';
 import { Loader2, FileText, Sparkles, ChevronLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +51,9 @@ const createLibrarySchema = z.object({
   displayName: z.string().min(1, '显示名称不能为空').max(100, '显示名称最多 100 个字符'),
   description: z.string().max(500, '描述最多 500 个字符').optional(),
   displayField: z.string().min(1).optional(),
+  category: z.enum(['MAIN', 'DIFF'], {
+    errorMap: () => ({ message: '必须选择库类型' }),
+  }),
 });
 
 type CreateLibraryFormData = z.infer<typeof createLibrarySchema>;
@@ -77,6 +82,7 @@ export function CreateLibraryDialog({
       name: '',
       displayName: '',
       displayField: 'name',
+      category: 'MAIN',
     },
   });
 
@@ -110,6 +116,7 @@ export function CreateLibraryDialog({
         displayName: data.displayName,
         description: data.description,
         displayField: data.displayField || 'name',
+        category: data.category,
         templateName: selectedTemplate?.name,
         schema: !selectedTemplate ? customSchema || undefined : undefined,
       });
@@ -295,6 +302,41 @@ export function CreateLibraryDialog({
                     </FormControl>
                     <FormDescription>
                       在列表中显示的主要字段名（默认: name）
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Library Category */}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>库类型 *</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex flex-col space-y-1"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="MAIN" id="category-main" />
+                          <Label htmlFor="category-main" className="font-normal cursor-pointer">
+                            <span className="font-medium">MAIN</span> - 主图库（用于主图模板）
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="DIFF" id="category-diff" />
+                          <Label htmlFor="category-diff" className="font-normal cursor-pointer">
+                            <span className="font-medium">DIFF</span> - 差异图库（用于差异图模板）
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormDescription>
+                      选择此库用于主图模板还是差异图模板
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

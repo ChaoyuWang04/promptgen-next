@@ -45,6 +45,7 @@ export async function GET(
         id: true,
         name: true,
         displayName: true,
+        category: true,
         entries: true,
         createdAt: true,
         updatedAt: true,
@@ -420,6 +421,22 @@ export async function PATCH(
     }
     if (body.displayField !== undefined) {
       updateData.displayField = body.displayField;
+    }
+    if (body.category !== undefined) {
+      // Validate category value
+      if (body.category !== 'MAIN' && body.category !== 'DIFF') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'category 必须是 MAIN 或 DIFF',
+            },
+          },
+          { status: 400 }
+        );
+      }
+      updateData.category = body.category;
     }
     if (body.order !== undefined) {
       updateData.order = body.order;

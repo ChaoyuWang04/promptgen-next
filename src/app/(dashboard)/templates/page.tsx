@@ -75,14 +75,21 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 export default function TemplatesPage() {
   const { toast } = useToast();
   const { data: templates, isLoading: templatesLoading } = useTemplates();
-  const { data: variables, isLoading: variablesLoading } = useTemplateVariables('MAIN');
+
+  // State for selected template
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+
+  // Get currently selected template object to determine its category
+  const currentTemplate = templates?.find((t) => t.id === selectedTemplate);
+  const currentCategory = currentTemplate?.category || 'MAIN';
+
+  // Dynamically load variables based on current template's category
+  const { data: variables, isLoading: variablesLoading } = useTemplateVariables(currentCategory);
   const { data: config } = useLibraryConfig();
   const previewMutation = usePreviewTemplate();
   const createMutation = useCreateTemplate();
   const updateMutation = useUpdateTemplate();
   const deleteMutation = useDeleteTemplate();
-
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [editorContent, setEditorContent] = useState('');
   const [originalContent, setOriginalContent] = useState('');
   const [previewSelections, setPreviewSelections] = useState<Record<string, string>>({});
@@ -136,8 +143,7 @@ export default function TemplatesPage() {
     };
   }, []);
 
-  // Get currently selected template object
-  const currentTemplate = templates?.find((t) => t.id === selectedTemplate);
+  // Check if current template is a system template
   const isSystemTemplate = currentTemplate?.type === 'SYSTEM';
 
   // Check if there are unsaved changes

@@ -32,6 +32,11 @@ export type LibraryStructureType = 'standard' | 'nested_array';
 export type LibraryRequirementType = 'required' | 'optional';
 
 /**
+ * Library category type (matches Prisma LibraryCategory enum)
+ */
+export type LibraryCategory = 'MAIN' | 'DIFF';
+
+/**
  * Library configuration interface
  */
 export interface LibraryConfig {
@@ -46,6 +51,9 @@ export interface LibraryConfig {
 
   /** Whether this library is required for prompt generation */
   type: LibraryRequirementType;
+
+  /** Library category: MAIN (用于主图模板) or DIFF (用于差异图模板) */
+  category: LibraryCategory;
 
   /** Sort order in UI */
   order: number;
@@ -73,6 +81,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
     displayName: '人物',
     displayField: 'name',
     type: 'required',
+    category: 'MAIN',
     order: 1,
     structureType: 'standard',
     description: '角色人物定义，包含外貌、服装、配色规则',
@@ -82,6 +91,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
     displayName: '姿态',
     displayField: 'name',
     type: 'required',
+    category: 'MAIN',
     order: 2,
     structureType: 'standard',
     description: '人物姿态动作，包含身体朝向、肢体位置、情绪',
@@ -91,6 +101,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
     displayName: '场景',
     displayField: 'name',
     type: 'required',
+    category: 'MAIN',
     order: 3,
     structureType: 'standard',
     description: '背景场景环境，包含地点、家具、氛围',
@@ -100,6 +111,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
     displayName: '主题',
     displayField: 'name',
     type: 'required',
+    category: 'MAIN',
     order: 4,
     structureType: 'standard',
     description: '节日或活动主题，包含特定装饰道具',
@@ -109,6 +121,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
     displayName: '画风',
     displayField: 'era_style',
     type: 'required',
+    category: 'MAIN',
     order: 5,
     structureType: 'standard',
     description: '艺术风格定义，包含色调、光照、渲染方式',
@@ -118,6 +131,7 @@ export const ENABLED_LIBRARIES: LibraryConfig[] = [
     displayName: '装饰小物',
     displayField: 'name',
     type: 'optional',
+    category: 'DIFF',
     order: 6,
     structureType: 'nested_array',
     description: '通用装饰小道具库，用于对比图生成',
@@ -172,6 +186,37 @@ export function getSortedLibraries(): LibraryConfig[] {
 }
 
 /**
+ * Get libraries by category
+ * @param category - MAIN or DIFF
+ * @returns Libraries matching the specified category
+ */
+export function getLibrariesByCategory(category: LibraryCategory): LibraryConfig[] {
+  return ENABLED_LIBRARIES.filter(lib => lib.category === category);
+}
+
+/**
+ * Get MAIN libraries (用于主图模板)
+ */
+export function getMainLibraries(): LibraryConfig[] {
+  return getLibrariesByCategory('MAIN');
+}
+
+/**
+ * Get DIFF libraries (用于差异图模板)
+ */
+export function getDiffLibraries(): LibraryConfig[] {
+  return getLibrariesByCategory('DIFF');
+}
+
+/**
+ * Check if a library belongs to a specific category
+ */
+export function isLibraryInCategory(libraryName: LibraryName, category: LibraryCategory): boolean {
+  const config = getLibraryConfig(libraryName);
+  return config?.category === category;
+}
+
+/**
  * Library ID field names (for parsing image IDs)
  */
 export const LIBRARY_ID_FIELDS: Record<LibraryName, string> = {
@@ -196,3 +241,5 @@ export function getLibraryIdField(name: LibraryName): string {
 export const TOTAL_LIBRARIES = ENABLED_LIBRARIES.length;
 export const REQUIRED_LIBRARIES_COUNT = getRequiredLibraries().length;
 export const OPTIONAL_LIBRARIES_COUNT = getOptionalLibraries().length;
+export const MAIN_LIBRARIES_COUNT = getMainLibraries().length;
+export const DIFF_LIBRARIES_COUNT = getDiffLibraries().length;

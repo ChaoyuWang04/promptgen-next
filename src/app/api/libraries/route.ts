@@ -19,6 +19,11 @@ export const dynamic = 'force-dynamic';
 // Request Validation Schemas
 // ========================================
 
+// Library category schema (matches Prisma enum)
+const LibraryCategorySchema = z.enum(['MAIN', 'DIFF'], {
+  errorMap: () => ({ message: 'Category must be either MAIN or DIFF' }),
+});
+
 const CreateLibrarySchema = z.object({
   name: z
     .string()
@@ -31,6 +36,7 @@ const CreateLibrarySchema = z.object({
     .max(100, 'Display name must be at most 100 characters'),
   description: z.string().optional(),
   displayField: z.string().default('name'),
+  category: LibraryCategorySchema.default('MAIN'), // MAIN (主图库) or DIFF (差异图库)
   // order 字段由系统自动分配，不接受用户输入
   templateName: z.string().optional(), // 如果提供，从模板创建
   schema: z.record(z.unknown()).optional(), // 如果不使用模板，必须提供 schema
@@ -178,6 +184,7 @@ export async function POST(request: NextRequest) {
         displayName: input.displayName,
         description: input.description,
         displayField: input.displayField,
+        category: input.category, // MAIN or DIFF
         order: nextOrder,
         schema: schema as any, // JSON 类型
         entries: entries as any, // JSON 类型

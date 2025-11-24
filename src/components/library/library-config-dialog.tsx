@@ -47,6 +47,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -85,6 +87,9 @@ const basicInfoSchema = z.object({
   displayName: z.string().min(1, '显示名称不能为空').max(100, '显示名称最多 100 个字符'),
   description: z.string().max(500, '描述最多 500 个字符').optional(),
   displayField: z.string().min(1, '显示字段不能为空'),
+  category: z.enum(['MAIN', 'DIFF'], {
+    errorMap: () => ({ message: '必须选择库类型' }),
+  }),
   isActive: z.boolean(),
 });
 
@@ -123,6 +128,7 @@ export function LibraryConfigDialog({
       displayName: '',
       description: '',
       displayField: 'name',
+      category: 'MAIN',
       isActive: true,
     },
   });
@@ -134,6 +140,7 @@ export function LibraryConfigDialog({
         displayName: stats.displayName,
         description: stats.description || '',
         displayField: stats.displayField,
+        category: (stats as any).category || 'MAIN',
         isActive: stats.isActive,
       });
       // Initialize schema from schema field
@@ -153,6 +160,7 @@ export function LibraryConfigDialog({
           displayName: data.displayName,
           description: data.description,
           displayField: data.displayField,
+          category: data.category,
           isActive: data.isActive,
         },
       });
@@ -315,6 +323,40 @@ export function LibraryConfigDialog({
                       </FormControl>
                       <FormDescription>
                         在列表中显示的主要字段名（默认: name）
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>库类型 *</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="MAIN" id="config-category-main" />
+                            <Label htmlFor="config-category-main" className="font-normal cursor-pointer">
+                              <span className="font-medium">MAIN</span> - 主图库（用于主图模板）
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="DIFF" id="config-category-diff" />
+                            <Label htmlFor="config-category-diff" className="font-normal cursor-pointer">
+                              <span className="font-medium">DIFF</span> - 差异图库（用于差异图模板）
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormDescription>
+                        选择此库用于主图模板还是差异图模板
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

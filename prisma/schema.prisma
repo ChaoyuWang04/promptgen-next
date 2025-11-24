@@ -46,11 +46,12 @@ model Combination {
 // 库配置表
 // ========================================
 model Library {
-  id            String   @id @default(cuid())
-  name          String   @unique  // character, pose, scene, theme, style, decorative_props
-  displayName   String            // 人物, 姿态, 场景, 主题, 画风, 装饰小物
-  description   String?           // 库描述说明
-  displayField  String   @default("name") // 在UI中显示的主要字段名
+  id            String          @id @default(cuid())
+  name          String          @unique  // character, pose, scene, theme, style, decorative_props
+  displayName   String                   // 人物, 姿态, 场景, 主题, 画风, 装饰小物
+  description   String?                  // 库描述说明
+  displayField  String          @default("name") // 在UI中显示的主要字段名
+  category      LibraryCategory @default(MAIN)   // 库类型：MAIN（主图库）或 DIFF（差异图库）
 
   // 库配置
   entries       Json              // 库条目JSON数组
@@ -69,6 +70,7 @@ model Library {
   updatedAt     DateTime @updatedAt
 
   @@index([name])
+  @@index([category, isActive])
   @@index([isActive, order])
 }
 
@@ -183,6 +185,11 @@ enum TemplateType {
 enum TemplateCategory {
   MAIN  // 主图模板
   DIFF  // 对比图模板
+}
+
+enum LibraryCategory {
+  MAIN  // 主图库（用于Main模板）
+  DIFF  // 差异图库（用于Diff模板）
 }
 
 // ========================================

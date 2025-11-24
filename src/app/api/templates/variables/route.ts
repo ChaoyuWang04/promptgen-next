@@ -81,7 +81,7 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
   for (const libConfig of ENABLED_LIBRARIES) {
     const library = await prisma.library.findUnique({
       where: { name: libConfig.name },
-      select: { schema: true, name: true },
+      select: { schema: true, name: true, category: true },
     });
 
     if (!library) {
@@ -89,6 +89,11 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
         library: libConfig.name,
         message: `库 "${libConfig.displayName}" 不存在于数据库中`,
       });
+      continue;
+    }
+
+    // Skip library if it doesn't match the requested category
+    if (category && library.category !== category) {
       continue;
     }
 
@@ -126,7 +131,7 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
         example: isArray
           ? `{{${variableName} | join}}`
           : `{{${variableName}}}`,
-        category: 'BOTH', // Available in both MAIN and DIFF templates
+        category: library.category, // Use library's category (MAIN or DIFF)
       });
     }
   }
