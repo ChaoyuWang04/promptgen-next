@@ -50,6 +50,11 @@ export interface StitchConfig {
   autoHeader: boolean;
 
   /**
+   * Fixed value for "tries" number (if set, overrides random generation)
+   */
+  fixedTries?: number;
+
+  /**
    * Minimum value for random "tries" number (default: 300)
    */
   triesMin: number;
@@ -127,6 +132,7 @@ export const DEFAULT_STITCH_CONFIG: StitchConfig = {
   gap: 20,
   bgColor: '#ffffff',
   autoHeader: true,
+  fixedTries: 465,  // Fixed "tries" number (set to 465 as required)
   triesMin: 300,
   triesMax: 999,
   diffsMin: 10,

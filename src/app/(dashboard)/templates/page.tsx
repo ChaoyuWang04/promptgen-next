@@ -63,7 +63,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Eye, Info, Sparkles, Save, SaveAll, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Eye, Info, Sparkles, Save, SaveAll, Trash2, AlertCircle, Shuffle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Dynamically import Monaco editor with loading state
@@ -350,6 +350,45 @@ export default function TemplatesPage() {
     }
   };
 
+  // Handle random selection for preview
+  const handleRandomSelection = async () => {
+    if (!config) return;
+
+    // Determine which libraries to fill based on template category
+    const librariesToFill =
+      currentCategory === 'DIFF'
+        ? ['character', 'pose', 'scene', 'theme', 'style', 'decorative_props']
+        : ['character', 'pose', 'scene', 'theme', 'style'];
+
+    const randomSelections: Record<string, string> = {};
+
+    // For each library, fetch entries and select a random one
+    for (const libName of librariesToFill) {
+      try {
+        const response = await fetch(`/api/libraries/${libName}`);
+        if (response.ok) {
+          const { data: library } = await response.json();
+          if (library?.entries) {
+            const entryIds = Object.keys(library.entries);
+            if (entryIds.length > 0) {
+              const randomId = entryIds[Math.floor(Math.random() * entryIds.length)];
+              randomSelections[libName] = randomId;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to load library ${libName}:`, error);
+      }
+    }
+
+    setPreviewSelections(randomSelections);
+
+    toast({
+      title: '已随机选择',
+      description: `已为 ${librariesToFill.length} 个库随机选择条目`,
+    });
+  };
+
   // Handle preview
   const handlePreview = async () => {
     if (!editorContent || !config) return;
@@ -590,10 +629,20 @@ export default function TemplatesPage() {
           <CardDescription>选择库元素查看渲染结果</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Library Selectors for Preview - show the 5 core libraries needed for template rendering */}
+          {/* Library Selectors for Preview - show libraries based on template category */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {config?.enabled_libraries
-              .filter((lib) => ['character', 'pose', 'scene', 'theme', 'style'].includes(lib.name))
+              .filter((lib) => {
+                const coreLibraries = ['character', 'pose', 'scene', 'theme', 'style'];
+                // MAIN templates: show only 5 core MAIN libraries
+                // DIFF templates: show 5 core libraries + decorative_props
+                if (currentCategory === 'MAIN') {
+                  return coreLibraries.includes(lib.name);
+                } else {
+                  // DIFF template: include all core libraries + decorative_props
+                  return coreLibraries.includes(lib.name) || lib.name === 'decorative_props';
+                }
+              })
               .sort((a, b) => a.order - b.order)
               .map((lib) => (
                 <LibraryPreviewSelector
@@ -609,23 +658,35 @@ export default function TemplatesPage() {
               ))}
           </div>
 
-          <Button
-            onClick={handlePreview}
-            disabled={previewMutation.isPending || !editorContent}
-            className="w-full"
-          >
-            {previewMutation.isPending ? (
-              <>
-                <LoadingSpinner size="sm" className="mr-2" />
-                预览中...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                生成预览
-              </>
-            )}
-          </Button>
+          {/* Random Selection and Preview Actions */}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRandomSelection}
+              variant="outline"
+              disabled={!config}
+              className="flex-1"
+            >
+              <Shuffle className="mr-2 h-4 w-4" />
+              随机选择
+            </Button>
+            <Button
+              onClick={handlePreview}
+              disabled={previewMutation.isPending || !editorContent}
+              className="flex-1"
+            >
+              {previewMutation.isPending ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  预览中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  生成预览
+                </>
+              )}
+            </Button>
+          </div>
 
           {previewResult && (
             <>

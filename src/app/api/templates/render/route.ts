@@ -50,21 +50,35 @@ async function loadLibraryEntry(libraryName: string, entryId: string): Promise<a
  * Build template context from library selections
  */
 async function buildContext(selections: LibrarySelection): Promise<TemplateContext> {
-  const [character, pose, scene, theme, style] = await Promise.all([
+  const promises = [
     loadLibraryEntry('character', selections.character),
     loadLibraryEntry('pose', selections.pose),
     loadLibraryEntry('scene', selections.scene),
     loadLibraryEntry('theme', selections.theme),
     loadLibraryEntry('style', selections.style),
-  ]);
+  ];
 
-  return {
+  // Add decorative_props if provided (for DIFF templates)
+  if ('decorative_props' in selections && selections.decorative_props) {
+    promises.push(loadLibraryEntry('decorative_props', selections.decorative_props));
+  }
+
+  const [character, pose, scene, theme, style, decorative_props] = await Promise.all(promises);
+
+  const context: TemplateContext = {
     character,
     pose,
     scene,
     theme,
     style,
   };
+
+  // Add decorative_props to context if it was loaded
+  if (decorative_props) {
+    (context as any).decorative_props = decorative_props;
+  }
+
+  return context;
 }
 
 /**

@@ -92,10 +92,13 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
       continue;
     }
 
-    // Skip library if it doesn't match the requested category
-    if (category && library.category !== category) {
+    // Skip library based on category:
+    // - MAIN templates: only include MAIN libraries
+    // - DIFF templates: include ALL libraries (MAIN + DIFF)
+    if (category === 'MAIN' && library.category !== 'MAIN') {
       continue;
     }
+    // For DIFF templates, we include all libraries (no skip)
 
     // Check if schema exists
     if (!library.schema) {
@@ -209,9 +212,11 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
   }
 
   // Filter by category if specified
-  const filteredVariables = category
-    ? variables.filter(v => v.category === category || v.category === 'BOTH')
-    : variables;
+  // - MAIN templates: only show MAIN variables
+  // - DIFF templates: show ALL variables (MAIN + DIFF)
+  const filteredVariables = category === 'MAIN'
+    ? variables.filter(v => v.category === 'MAIN' || v.category === 'BOTH')
+    : variables; // For DIFF or no category, include all variables
 
   return {
     variables: filteredVariables,

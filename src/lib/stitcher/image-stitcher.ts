@@ -56,9 +56,6 @@ export interface StitchOptions {
 export class ImageStitcher {
   private config: StitchConfig;
 
-  // Fixed canvas width (matches Python CANVAS_WIDTH)
-  private readonly CANVAS_WIDTH = 2880;
-
   constructor(config?: Partial<StitchConfig>) {
     this.config = { ...DEFAULT_STITCH_CONFIG, ...config };
   }
@@ -90,11 +87,11 @@ export class ImageStitcher {
       // Load font
       const fontFamily = loadFont(languageId);
 
-      // Generate random numbers for template variables
-      const tries = this.randomInt(this.config.triesMin, this.config.triesMax);
+      // Generate tries number (use fixed value if configured, otherwise random)
+      const tries = this.config.fixedTries ?? this.randomInt(this.config.triesMin, this.config.triesMax);
       const diffs = this.randomInt(this.config.diffsMin, this.config.diffsMax);
 
-      console.log(`[ImageStitcher] Random values: tries=${tries}, diffs=${diffs}`);
+      console.log(`[ImageStitcher] Values: tries=${tries}${this.config.fixedTries ? ' (fixed)' : ''}, diffs=${diffs}`);
 
       // Substitute template variables
       const line1 = this.substituteVariables(template.line1, { tries, diffs });
@@ -134,12 +131,13 @@ export class ImageStitcher {
       // Calculate header height (2 lines + padding)
       const headerHeight = Math.ceil(lineHeight * 2 + this.config.pad);
 
-      // Calculate canvas dimensions
-      const canvasWidth = this.CANVAS_WIDTH;
+      // Calculate canvas dimensions (dynamic width based on image sizes - Python style)
+      // Formula: pad + leftWidth + gap + rightWidth + pad
+      const canvasWidth = this.config.pad + leftImage.width + this.config.gap + rightImage.width + this.config.pad;
       const canvasHeight = headerHeight + targetHeight + this.config.pad;
 
       console.log(
-        `[ImageStitcher] Canvas dimensions: ${canvasWidth}x${canvasHeight} (header=${headerHeight}px, images=${targetHeight}px)`
+        `[ImageStitcher] Canvas dimensions: ${canvasWidth}x${canvasHeight} (header=${headerHeight}px, images=${targetHeight}px, dynamic width)`
       );
 
       // Create final canvas
@@ -150,12 +148,9 @@ export class ImageStitcher {
       ctx.fillStyle = this.config.bgColor;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      // Calculate half width
-      const halfWidth = canvasWidth / 2;
-
-      // Calculate image positions (centered within each half)
-      const leftImageX = (halfWidth - leftImage.width) / 2;
-      const rightImageX = halfWidth + (halfWidth - rightImage.width) / 2;
+      // Calculate image positions (side-by-side with gap - Python style)
+      const leftImageX = this.config.pad;
+      const rightImageX = this.config.pad + leftImage.width + this.config.gap;
       const imageY = headerHeight;
 
       // Draw images
@@ -163,41 +158,26 @@ export class ImageStitcher {
       ctx.drawImage(rightImage, rightImageX, imageY, rightImage.width, rightImage.height);
 
       console.log(
-        `[ImageStitcher] Images placed at: left=(${leftImageX}, ${imageY}), right=(${rightImageX}, ${imageY})`
+        `[ImageStitcher] Images placed side-by-side: left=(${leftImageX}, ${imageY}), right=(${rightImageX}, ${imageY}), gap=${this.config.gap}px`
       );
 
-      // Draw text overlays
-      const leftTextX = halfWidth / 2;
-      const rightTextX = halfWidth + halfWidth / 2;
+      // Draw text overlay (centered on entire canvas top - Python style, shown once only)
+      const textX = canvasWidth / 2;
       const textY = this.config.pad;
 
-      // Draw left text
       drawTwoLineCenteredText(
         canvas,
         ctx,
         line1,
         line2,
-        leftTextX,
+        textX,
         textY,
         fontSize,
         fontFamily,
         '#000000'
       );
 
-      // Draw right text
-      drawTwoLineCenteredText(
-        canvas,
-        ctx,
-        line1,
-        line2,
-        rightTextX,
-        textY,
-        fontSize,
-        fontFamily,
-        '#000000'
-      );
-
-      console.log(`[ImageStitcher] Text overlays rendered`);
+      console.log(`[ImageStitcher] Text overlay rendered (centered at x=${textX})`);
 
       // Convert canvas to buffer
       const buffer = canvas.toBuffer('image/png');
