@@ -16,7 +16,7 @@ import path from 'path';
 
 // Import providers and stitcher
 import { ProviderManager } from '@/lib/providers';
-import { ImageStitcher } from '@/lib/stitcher/image-stitcher';
+import { PythonStitcher } from '@/lib/stitcher/python-stitcher';
 import { generateMainPrompt } from '@/lib/generators/main-prompt-generator';
 import { generateDiffPrompt } from '@/lib/generators/diff-prompt-generator';
 
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           : undefined,
       };
       const providerManager = new ProviderManager(providerConfig);
-      const stitcher = new ImageStitcher();
+      const stitcher = new PythonStitcher();
 
       // Round 1: Generate main image
       // Note: Using Chinese prompt directly since Gemini can handle it

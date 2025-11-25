@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { GenerateLanguageRequestSchema } from '@/schemas/combination.schema';
-import { ImageStitcher } from '@/lib/stitcher/image-stitcher';
+import { PythonStitcher } from '@/lib/stitcher/python-stitcher';
 import path from 'path';
 
 interface RouteParams {
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Generate the language version
-    const stitcher = new ImageStitcher();
+    const stitcher = new PythonStitcher();
     const version = imageVariant.version;
 
     const outputPath = path.join(

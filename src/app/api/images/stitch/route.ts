@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ImageStitcher } from '@/lib/stitcher/image-stitcher';
+import { PythonStitcher } from '@/lib/stitcher/python-stitcher';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create stitcher
-    const stitcher = new ImageStitcher();
+    const stitcher = new PythonStitcher();
 
     // Stitch for each language
     const stitchedPaths: Record<string, string> = {};

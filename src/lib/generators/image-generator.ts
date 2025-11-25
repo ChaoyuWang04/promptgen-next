@@ -10,7 +10,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { prisma } from '@/lib/db/prisma';
 import { ProviderManager, ProviderAttempt } from '@/lib/providers';
-import { ImageStitcher } from '@/lib/stitcher/image-stitcher';
+import { PythonStitcher } from '@/lib/stitcher/python-stitcher';
 
 /**
  * Language IDs for final image generation
@@ -75,11 +75,11 @@ export interface ImageGenerationResult {
  */
 export class ImageGenerator {
   private providerManager: ProviderManager;
-  private stitcher: ImageStitcher;
+  private stitcher: PythonStitcher;
 
   constructor(providerManager: ProviderManager) {
     this.providerManager = providerManager;
-    this.stitcher = new ImageStitcher();
+    this.stitcher = new PythonStitcher();
   }
 
   /**
