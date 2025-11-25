@@ -42,6 +42,7 @@ import { useTemplates } from '@/hooks/use-templates';
 import { CombinationList } from '@/components/combinations/combination-list';
 import { CombinationDetail } from '@/components/combinations/combination-detail';
 import { StrategyGenerationDialog } from '@/components/combinations/strategy-generation-dialog';
+import { BatchProgressBar } from '@/components/combinations/batch-progress-bar';
 
 export default function CombinationsPage() {
   // State
@@ -49,6 +50,9 @@ export default function CombinationsPage() {
   const [search, setSearch] = useState('');
   const [templateFilter, setTemplateFilter] = useState<string>('');
   const [isStrategyDialogOpen, setIsStrategyDialogOpen] = useState(false);
+
+  // Batch generation state
+  const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -153,6 +157,16 @@ export default function CombinationsPage() {
           策略生成
         </Button>
       </div>
+
+      {/* Batch Progress Bar */}
+      {currentBatchId && (
+        <div className="px-4 pt-4">
+          <BatchProgressBar
+            batchId={currentBatchId}
+            onDismiss={() => setCurrentBatchId(null)}
+          />
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
@@ -363,6 +377,7 @@ export default function CombinationsPage() {
       <StrategyGenerationDialog
         open={isStrategyDialogOpen}
         onOpenChange={setIsStrategyDialogOpen}
+        onBatchStarted={(batchId) => setCurrentBatchId(batchId)}
       />
     </div>
   );

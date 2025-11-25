@@ -59,6 +59,11 @@ interface StrategyGenerationResponse {
   skipped: number;
   createdKeys: string[];
   skippedKeys: string[];
+  createdCombinations?: Array<{
+    id: string;
+    combinationKey: string;
+    imageIds: string[];
+  }>;
 }
 
 // Fetch helpers

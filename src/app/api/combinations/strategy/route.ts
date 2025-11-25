@@ -235,6 +235,14 @@ export async function POST(request: NextRequest) {
     const created: string[] = [];
     const skipped: string[] = [];
 
+    // Track created combinations with imageIds for batch generation
+    interface CreatedCombination {
+      id: string;
+      combinationKey: string;
+      imageIds: string[];
+    }
+    const createdCombinations: CreatedCombination[] = [];
+
     for (const combo of combinations) {
       try {
         // Use imageId as the unique combination key
@@ -247,7 +255,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        await prisma.combination.create({
+        const newCombination = await prisma.combination.create({
           data: {
             combinationKey: combo.imageId,
             libraryIds: combo.libraryIds,
@@ -258,6 +266,13 @@ export async function POST(request: NextRequest) {
         });
 
         created.push(combo.imageId);
+
+        // Store created combination with imageIds for batch generation
+        createdCombinations.push({
+          id: newCombination.id,
+          combinationKey: combo.imageId,
+          imageIds: [combo.imageId], // Each combination has one imageId
+        });
       } catch (error) {
         // Handle unique constraint violation (race condition)
         if ((error as any).code === 'P2002') {
@@ -278,6 +293,7 @@ export async function POST(request: NextRequest) {
         total: combinations.length,
         created: created.length,
         skipped: skipped.length,
+        createdCombinations, // NEW: Include full details with imageIds
         createdKeys: created.slice(0, 10), // Return first 10 for preview
         skippedKeys: skipped.slice(0, 10),
       },

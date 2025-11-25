@@ -35,17 +35,22 @@ import {
   usePreviewCombinations,
   useGenerateCombinations,
 } from '@/hooks/use-combinations';
+import { useGenerateBatch } from '@/hooks/use-images';
+import { useToast } from '@/hooks/use-toast';
+import { BatchGenerationStep } from './batch-generation-step';
 
 interface StrategyGenerationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onBatchStarted?: (batchId: string) => void;
 }
 
-type Step = 'template' | 'configure' | 'preview' | 'confirm';
+type Step = 'template' | 'configure' | 'preview' | 'batch';
 
 export function StrategyGenerationDialog({
   open,
   onOpenChange,
+  onBatchStarted,
 }: StrategyGenerationDialogProps) {
   // State
   const [step, setStep] = useState<Step>('template');
@@ -53,11 +58,17 @@ export function StrategyGenerationDialog({
   const [selectedDiffTemplateId, setSelectedDiffTemplateId] = useState<string>('');
   const [strategyConfig, setStrategyConfig] = useState<Record<string, string[]>>({});
 
+  // Batch generation state
+  const [selectedLanguages, setSelectedLanguages] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
+  const [continueOnError, setContinueOnError] = useState(true);
+
   // Hooks
   const { data: templates, isLoading: isLoadingTemplates } = useTemplates();
   const { data: templateLibraries } = useTemplateLibraries(selectedMainTemplateId);
   const previewMutation = usePreviewCombinations();
   const generateMutation = useGenerateCombinations();
+  const generateBatchMutation = useGenerateBatch();
+  const { toast } = useToast();
 
   // Separate main and diff templates
   const mainTemplates = useMemo(
@@ -76,6 +87,8 @@ export function StrategyGenerationDialog({
       setSelectedMainTemplateId('');
       setSelectedDiffTemplateId('');
       setStrategyConfig({});
+      setSelectedLanguages([1, 2, 3, 4, 5, 6, 7]);
+      setContinueOnError(true);
       previewMutation.reset();
     }
   }, [open]);
@@ -269,6 +282,19 @@ export function StrategyGenerationDialog({
     );
   };
 
+  // Step 4: Batch Generation (Optional)
+  const renderBatchStep = () => {
+    return (
+      <BatchGenerationStep
+        totalCombinations={previewMutation.data?.totalCombinations || 0}
+        selectedLanguages={selectedLanguages}
+        onLanguagesChange={setSelectedLanguages}
+        continueOnError={continueOnError}
+        onContinueOnErrorChange={setContinueOnError}
+      />
+    );
+  };
+
   // Handle preview
   const handlePreview = async () => {
     await previewMutation.mutateAsync({
@@ -279,8 +305,8 @@ export function StrategyGenerationDialog({
     setStep('preview');
   };
 
-  // Handle generate
-  const handleGenerate = async () => {
+  // Handle skip batch generation (only create combinations)
+  const handleSkipBatch = async () => {
     await generateMutation.mutateAsync({
       mainTemplateId: selectedMainTemplateId,
       diffTemplateId: selectedDiffTemplateId,
@@ -289,22 +315,76 @@ export function StrategyGenerationDialog({
     onOpenChange(false);
   };
 
+  // Handle start batch generation
+  const handleStartBatch = async () => {
+    try {
+      // First create combinations
+      const result = await generateMutation.mutateAsync({
+        mainTemplateId: selectedMainTemplateId,
+        diffTemplateId: selectedDiffTemplateId,
+        strategyConfig,
+      });
+
+      // Extract imageIds from created combinations
+      const imageIds = result.createdCombinations?.flatMap((c: any) => c.imageIds) || [];
+
+      if (imageIds.length === 0) {
+        toast({
+          title: '无需生成',
+          description: '所有组合已存在，无需批量生成',
+        });
+        onOpenChange(false);
+        return;
+      }
+
+      // Start batch generation
+      const batchResult = await generateBatchMutation.mutateAsync({
+        imageIds,
+        languageIds: selectedLanguages,
+        continueOnError,
+        concurrency: 1,
+      });
+
+      // Notify parent about batch started
+      if (onBatchStarted && batchResult.data?.batchId) {
+        onBatchStarted(batchResult.data.batchId);
+      }
+
+      toast({
+        title: '批量生成已启动',
+        description: `正在生成 ${imageIds.length} 个组合的图片，请在进度栏查看进度`,
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to start batch generation:', error);
+      toast({
+        title: '批量生成失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Navigation helpers
   const canGoNext = () => {
     if (step === 'template') return !!selectedMainTemplateId && !!selectedDiffTemplateId && !!templateLibraries;
     if (step === 'configure') return true;
     if (step === 'preview') return !!previewMutation.data;
+    if (step === 'batch') return selectedLanguages.length > 0;
     return false;
   };
 
   const handleNext = () => {
     if (step === 'template') setStep('configure');
     else if (step === 'configure') handlePreview();
+    else if (step === 'preview') setStep('batch');
   };
 
   const handleBack = () => {
     if (step === 'configure') setStep('template');
     else if (step === 'preview') setStep('configure');
+    else if (step === 'batch') setStep('preview');
   };
 
   // Current step content
@@ -312,7 +392,7 @@ export function StrategyGenerationDialog({
     template: renderTemplateStep(),
     configure: renderConfigureStep(),
     preview: renderPreviewStep(),
-    confirm: null,
+    batch: renderBatchStep(),
   }[step];
 
   return (
@@ -324,29 +404,30 @@ export function StrategyGenerationDialog({
             {step === 'template' && '选择模板以自动识别引用的库'}
             {step === 'configure' && '配置每个库的元素选择（支持多选）'}
             {step === 'preview' && '确认生成配置'}
+            {step === 'batch' && '批量生成图片（可选）'}
           </DialogDescription>
         </DialogHeader>
 
         {/* Step Indicator */}
         <div className="flex items-center justify-center gap-2 py-2">
-          {(['template', 'configure', 'preview'] as Step[]).map((s, i) => (
+          {(['template', 'configure', 'preview', 'batch'] as Step[]).map((s, i) => (
             <div key={s} className="flex items-center">
               <div
                 className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
                   step === s
                     ? 'border-primary bg-primary text-primary-foreground'
-                    : i < (['template', 'configure', 'preview'] as Step[]).indexOf(step)
+                    : i < (['template', 'configure', 'preview', 'batch'] as Step[]).indexOf(step)
                     ? 'border-primary bg-primary/10'
                     : 'border-muted'
                 }`}
               >
-                {i < (['template', 'configure', 'preview'] as Step[]).indexOf(step) ? (
+                {i < (['template', 'configure', 'preview', 'batch'] as Step[]).indexOf(step) ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   <span className="text-xs">{i + 1}</span>
                 )}
               </div>
-              {i < 2 && <div className="w-12 h-0.5 bg-muted mx-2" />}
+              {i < 3 && <div className="w-12 h-0.5 bg-muted mx-2" />}
             </div>
           ))}
         </div>
@@ -365,22 +446,44 @@ export function StrategyGenerationDialog({
               上一步
             </Button>
           )}
-          {step !== 'preview' && (
+          {step !== 'preview' && step !== 'batch' && (
             <Button onClick={handleNext} disabled={!canGoNext()}>
               下一步
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           )}
           {step === 'preview' && (
-            <Button
-              onClick={handleGenerate}
-              disabled={!previewMutation.data || generateMutation.isPending}
-            >
-              {generateMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              确认生成 {previewMutation.data?.totalCombinations || 0} 个组合
+            <Button onClick={handleNext} disabled={!previewMutation.data}>
+              下一步：配置批量生成
+              <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
+          )}
+          {step === 'batch' && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleSkipBatch}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                跳过批量生成
+              </Button>
+              <Button
+                onClick={handleStartBatch}
+                disabled={
+                  selectedLanguages.length === 0 ||
+                  generateMutation.isPending ||
+                  generateBatchMutation.isPending
+                }
+              >
+                {(generateMutation.isPending || generateBatchMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                立即生成 ({selectedLanguages.length} 语言)
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
