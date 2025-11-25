@@ -19,6 +19,7 @@ import {
 } from '@/hooks/use-templates';
 import { useLibraryConfig, useLibrary } from '@/hooks/use-libraries';
 import { createTemplateAutocomplete } from '@/lib/monaco/template-autocomplete';
+import { extractLibrariesFromTemplate } from '@/lib/utils/template-parser';
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,6 +95,7 @@ export default function TemplatesPage() {
   const [originalContent, setOriginalContent] = useState('');
   const [previewSelections, setPreviewSelections] = useState<Record<string, string>>({});
   const [previewResult, setPreviewResult] = useState<string | null>(null);
+  const [referencedLibraries, setReferencedLibraries] = useState<string[]>([]);
 
   // Dialog states
   const [showSaveAsDialog, setShowSaveAsDialog] = useState(false);
@@ -159,6 +161,19 @@ export default function TemplatesPage() {
       }
     }
   }, [selectedTemplate, templates]);
+
+  // Parse library references when template changes (switch or save)
+  useEffect(() => {
+    if (currentTemplate?.content) {
+      const libs = extractLibrariesFromTemplate(currentTemplate.content);
+      setReferencedLibraries(libs);
+      // Clear previous selections and preview when template changes
+      setPreviewSelections({});
+      setPreviewResult(null);
+    } else {
+      setReferencedLibraries([]);
+    }
+  }, [selectedTemplate, currentTemplate?.content]);
 
   // Add beforeunload event listener to warn about unsaved changes
   useEffect(() => {
@@ -242,6 +257,12 @@ export default function TemplatesPage() {
         content: editorContent,
       });
       setOriginalContent(editorContent);
+      // Update referenced libraries after save
+      const libs = extractLibrariesFromTemplate(editorContent);
+      setReferencedLibraries(libs);
+      // Clear previous selections since template content changed
+      setPreviewSelections({});
+      setPreviewResult(null);
     } catch (error) {
       // Error toast handled by mutation
     }
@@ -271,6 +292,13 @@ export default function TemplatesPage() {
       setSelectedTemplate(newTemplate.id);
       setOriginalContent(editorContent);
       setShowSaveAsDialog(false);
+
+      // Update referenced libraries after save
+      const libs = extractLibrariesFromTemplate(editorContent);
+      setReferencedLibraries(libs);
+      // Clear previous selections
+      setPreviewSelections({});
+      setPreviewResult(null);
 
       // Reset form
       setNewTemplateName('');
@@ -350,56 +378,91 @@ export default function TemplatesPage() {
     }
   };
 
-  // Handle random selection for preview
+  // Handle random selection for preview - parallel loading + auto preview
   const handleRandomSelection = async () => {
-    if (!config) return;
+    if (!config || referencedLibraries.length === 0) {
+      toast({
+        title: '无法随机选择',
+        description: '模板未引用任何库，请先在模板中添加库引用并保存',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    // Determine which libraries to fill based on template category
-    const librariesToFill =
-      currentCategory === 'DIFF'
-        ? ['character', 'pose', 'scene', 'theme', 'style', 'decorative_props']
-        : ['character', 'pose', 'scene', 'theme', 'style'];
-
-    const randomSelections: Record<string, string> = {};
-
-    // For each library, fetch entries and select a random one
-    for (const libName of librariesToFill) {
+    // Parallel load all referenced libraries
+    const promises = referencedLibraries.map(async (libName) => {
       try {
         const response = await fetch(`/api/libraries/${libName}`);
         if (response.ok) {
-          const { data: library } = await response.json();
-          if (library?.entries) {
-            const entryIds = Object.keys(library.entries);
+          const { data: entries } = await response.json();
+          if (entries && typeof entries === 'object') {
+            const entryIds = Object.keys(entries);
             if (entryIds.length > 0) {
-              const randomId = entryIds[Math.floor(Math.random() * entryIds.length)];
-              randomSelections[libName] = randomId;
+              return {
+                libName,
+                entryId: entryIds[Math.floor(Math.random() * entryIds.length)],
+              };
             }
           }
         }
       } catch (error) {
         console.error(`Failed to load library ${libName}:`, error);
       }
-    }
-
-    setPreviewSelections(randomSelections);
-
-    toast({
-      title: '已随机选择',
-      description: `已为 ${librariesToFill.length} 个库随机选择条目`,
+      return null;
     });
+
+    const results = await Promise.all(promises);
+    const selections: Record<string, string> = {};
+    results.forEach((r) => {
+      if (r) selections[r.libName] = r.entryId;
+    });
+
+    setPreviewSelections(selections);
+
+    // Auto generate preview if all libraries are selected
+    if (Object.keys(selections).length === referencedLibraries.length) {
+      try {
+        const result = await previewMutation.mutateAsync({
+          content: editorContent,
+          library_ids: selections,
+        });
+        setPreviewResult(result.rendered);
+        toast({
+          title: '预览已生成',
+          description: `已为 ${referencedLibraries.length} 个库随机选择并生成预览`,
+        });
+      } catch (error) {
+        // Error handled by mutation
+      }
+    } else {
+      toast({
+        title: '部分库选择失败',
+        description: '部分库无法加载，请手动选择后生成预览',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Handle preview
   const handlePreview = async () => {
     if (!editorContent || !config) return;
 
-    // Check that all 5 core libraries are selected
-    const coreLibraries = ['character', 'pose', 'scene', 'theme', 'style'];
-    const missingLibraries = coreLibraries.filter((lib) => !previewSelections[lib]);
+    // Check if template references any libraries
+    if (referencedLibraries.length === 0) {
+      toast({
+        title: '模板未引用库',
+        description: '请在模板中添加库引用并保存后再预览',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check that all referenced libraries are selected
+    const missingLibraries = referencedLibraries.filter((lib) => !previewSelections[lib]);
 
     if (missingLibraries.length > 0) {
       toast({
-        title: '请选择所有必需的库',
+        title: '请选择所有引用的库',
         description: `缺少: ${missingLibraries.join(', ')}`,
         variant: 'destructive',
       });
@@ -629,49 +692,48 @@ export default function TemplatesPage() {
           <CardDescription>选择库元素查看渲染结果</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Library Selectors for Preview - show libraries based on template category */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {config?.enabled_libraries
-              .filter((lib) => {
-                const coreLibraries = ['character', 'pose', 'scene', 'theme', 'style'];
-                // MAIN templates: show only 5 core MAIN libraries
-                // DIFF templates: show 5 core libraries + decorative_props
-                if (currentCategory === 'MAIN') {
-                  return coreLibraries.includes(lib.name);
-                } else {
-                  // DIFF template: include all core libraries + decorative_props
-                  return coreLibraries.includes(lib.name) || lib.name === 'decorative_props';
-                }
-              })
-              .sort((a, b) => a.order - b.order)
-              .map((lib) => (
-                <LibraryPreviewSelector
-                  key={lib.name}
-                  libraryName={lib.name}
-                  displayName={lib.displayName}
-                  displayField={lib.displayField}
-                  value={previewSelections[lib.name]}
-                  onChange={(value) =>
-                    setPreviewSelections((prev) => ({ ...prev, [lib.name]: value }))
-                  }
-                />
-              ))}
-          </div>
+          {/* Library Selectors for Preview - dynamically show only referenced libraries */}
+          {referencedLibraries.length === 0 ? (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                模板未引用任何库变量。请在模板中使用 <code className="text-xs">{`{{library.field}}`}</code> 语法引用库，然后保存模板。
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {config?.enabled_libraries
+                .filter((lib) => referencedLibraries.includes(lib.name))
+                .sort((a, b) => a.order - b.order)
+                .map((lib) => (
+                  <LibraryPreviewSelector
+                    key={lib.name}
+                    libraryName={lib.name}
+                    displayName={lib.displayName}
+                    displayField={lib.displayField}
+                    value={previewSelections[lib.name]}
+                    onChange={(value) =>
+                      setPreviewSelections((prev) => ({ ...prev, [lib.name]: value }))
+                    }
+                  />
+                ))}
+            </div>
+          )}
 
           {/* Random Selection and Preview Actions */}
           <div className="flex items-center gap-2">
             <Button
               onClick={handleRandomSelection}
               variant="outline"
-              disabled={!config}
+              disabled={!config || referencedLibraries.length === 0}
               className="flex-1"
             >
               <Shuffle className="mr-2 h-4 w-4" />
-              随机选择
+              随机选择并预览
             </Button>
             <Button
               onClick={handlePreview}
-              disabled={previewMutation.isPending || !editorContent}
+              disabled={previewMutation.isPending || !editorContent || referencedLibraries.length === 0}
               className="flex-1"
             >
               {previewMutation.isPending ? (
