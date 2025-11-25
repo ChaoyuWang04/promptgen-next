@@ -65,10 +65,23 @@ function findFontFile(fontFileName: string): string {
 export function loadFont(languageId: number): string {
   // Get font file name for this language
   const fontFileName = getLanguageFontFile(languageId);
-  const fontFamily = `Font_Lang${languageId}`;
 
-  // Skip if already loaded
+  // Map to actual font family names (use the font's internal name)
+  const fontFamilyMap: Record<number, string> = {
+    1: 'Arial',           // English - ARIAL.TTF
+    2: 'Noto Sans',       // French - NotoSans-Regular.ttf (or NotoSansJP-Regular.otf)
+    3: 'Noto Sans JP',    // Japanese - NotoSansJP-Regular.otf
+    4: 'Noto Sans KR',    // Korean - NotoSansKR-Regular.otf
+    5: 'Noto Sans',       // German - NotoSans-Regular.ttf
+    6: 'Noto Sans',       // Spanish - NotoSans-Regular.ttf
+    7: 'Noto Sans TC',    // Chinese - NotoSansTC-Regular.otf
+  };
+
+  const fontFamily = fontFamilyMap[languageId] || 'Arial';
+
+  // Skip if already loaded (but still log it)
   if (loadedFonts.has(fontFamily)) {
+    console.log(`[FontLoader] Font already loaded: ${fontFamily}`);
     return fontFamily;
   }
 
@@ -78,8 +91,9 @@ export function loadFont(languageId: number): string {
 
     console.log(`[FontLoader] Loading font for language ${languageId}: ${fontFileName}`);
     console.log(`[FontLoader] Found at: ${fontPath}`);
+    console.log(`[FontLoader] Registering as font family: "${fontFamily}"`);
 
-    // Register font with node-canvas
+    // Register font with node-canvas using the font's actual family name
     registerFont(fontPath, {
       family: fontFamily,
       weight: 'normal',
@@ -154,4 +168,16 @@ export function checkFontFiles(): Record<number, { exists: boolean; path?: strin
 export function clearFontCache(): void {
   loadedFonts.clear();
   console.log('[FontLoader] Font cache cleared');
+}
+
+/**
+ * Auto-preload all fonts at module load time
+ * This ensures fonts are registered before any canvas operations
+ */
+try {
+  console.log('[FontLoader] Auto-preloading all fonts at module initialization...');
+  preloadAllFonts();
+  console.log('[FontLoader] Auto-preload complete');
+} catch (error) {
+  console.error('[FontLoader] Auto-preload failed:', error);
 }

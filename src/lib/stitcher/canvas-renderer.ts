@@ -105,14 +105,18 @@ export function drawMulticolorCenteredText(options: TextRenderOptions): number {
 
   // Parse colored spans
   const spans = parseColoredSpans(text, defaultColor);
+  console.log(`[CanvasRenderer] Rendering ${spans.length} text spans`);
 
   if (spans.length === 0) {
+    console.warn(`[CanvasRenderer] No text spans to render!`);
     return 0;
   }
 
   // Set font for measurements
-  ctx.font = `${fontSize}px ${fontFamily}`;
+  // Use full font specification with quoted family name: [style] [variant] [weight] [size] [family]
+  ctx.font = `normal normal normal ${fontSize}px '${fontFamily}'`;
   ctx.textBaseline = 'alphabetic';
+  console.log(`[CanvasRenderer] Using font: "${ctx.font}"`);
 
   // Measure total width
   let totalWidth = 0;
@@ -134,6 +138,10 @@ export function drawMulticolorCenteredText(options: TextRenderOptions): number {
 
     // Set color for this span
     ctx.fillStyle = span.color;
+    ctx.globalAlpha = 1.0;  // Ensure text is opaque
+
+    // Log before drawing
+    console.log(`[CanvasRenderer] Drawing span ${i+1}/${spans.length}: "${span.text}" at (${Math.round(currentX)}, ${y}), color=${span.color}`);
 
     // Draw text
     ctx.fillText(span.text, currentX, y);
@@ -142,6 +150,7 @@ export function drawMulticolorCenteredText(options: TextRenderOptions): number {
     currentX += spanWidth;
   }
 
+  console.log(`[CanvasRenderer] Text render complete, total width: ${Math.round(totalWidth)}px`);
   return totalWidth;
 }
 
@@ -171,8 +180,8 @@ export function drawTwoLineCenteredText(
   fontFamily: string,
   defaultColor: string = '#000000'
 ): number {
-  // Set font
-  ctx.font = `${fontSize}px ${fontFamily}`;
+  // Set font with full specification
+  ctx.font = `normal normal normal ${fontSize}px ${fontFamily}`;
 
   // Calculate line height
   const lineHeight = getLineHeight(ctx, fontSize);
@@ -250,7 +259,7 @@ export function drawSimpleText(
   fontFamily: string,
   color: string = '#000000'
 ): void {
-  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.font = `normal normal normal ${fontSize}px ${fontFamily}`;
   ctx.fillStyle = color;
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(text, x, y);

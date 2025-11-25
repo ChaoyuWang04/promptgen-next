@@ -86,6 +86,7 @@ export class ImageStitcher {
 
       // Load font
       const fontFamily = loadFont(languageId);
+      console.log(`[ImageStitcher] Using font family: "${fontFamily}"`);
 
       // Generate tries number (use fixed value if configured, otherwise random)
       const tries = this.config.fixedTries ?? this.randomInt(this.config.triesMin, this.config.triesMax);
@@ -144,9 +145,11 @@ export class ImageStitcher {
       const canvas = createCanvas(canvasWidth, canvasHeight);
       const ctx = canvas.getContext('2d');
 
-      // Fill background
+      // Fill background (ensure it's opaque white)
       ctx.fillStyle = this.config.bgColor;
+      ctx.globalAlpha = 1.0;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      console.log(`[ImageStitcher] Background filled: ${this.config.bgColor}, alpha=1.0`);
 
       // Calculate image positions (side-by-side with gap - Python style)
       const leftImageX = this.config.pad;
@@ -164,6 +167,11 @@ export class ImageStitcher {
       // Draw text overlay (centered on entire canvas top - Python style, shown once only)
       const textX = canvasWidth / 2;
       const textY = this.config.pad;
+
+      // Confirm font setting before rendering text
+      // Use full font specification: [style] [variant] [weight] [size] [family]
+      ctx.font = `normal normal normal ${fontSize}px ${fontFamily}`;
+      console.log(`[ImageStitcher] Font before text render: "${ctx.font}"`);
 
       drawTwoLineCenteredText(
         canvas,
