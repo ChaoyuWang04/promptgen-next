@@ -12,7 +12,9 @@
 ### 技术栈（实际版本）
 - **前端**: Next.js 16.0.3 + React 19.2.0 + shadcn/ui + Tailwind CSS 3.4.15
 - **后端**: Next.js API Routes + TypeScript 5.6.3
-- **数据库**: PostgreSQL 16-alpine + Prisma 6.0.0
+- **数据库**: PostgreSQL 16-alpine + Prisma 6.0.0 (ORM only)
+- **迁移**: Atlas 0.38.1 (declarative migrations, Prisma schema as source)
+- **命令**: Just 1.43.1 (command runner)
 - **验证**: Zod 3.23.0
 - **测试**: Vitest 2.1.6 + Playwright 1.48.2
 - **部署**: Vercel + 自托管nginx (待实施)

@@ -36,8 +36,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
-/prisma/migrations/
+# prisma (migrations now managed by Atlas)
+# /prisma/migrations/  # Keep for historical reference
+
+# atlas
+atlas/migrations/*.sql~
+atlas/.atlas
 
 # test results
 /test-results/

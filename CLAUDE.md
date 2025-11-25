@@ -1,5 +1,5 @@
 The most important thing that u need to keep in your mind:
-**Remember**: Always think ultra hard and use proper mcp tools and sub-agents when needed. For requirements, always think proactively first and always articulate the reasoning process step by step—identify which parts of the existing system this new change will affect. For implementation, always analyze how we can ensure the new feature implementation integrates perfectly with the existing system and ensure the new system is robust and complete. Meanwhile, please ask me questions at any time to ensure our expectations for the system are aligned. We not only need to implement this new feature but also ensure its interaction with other system components is perfect. After implementation, please update todo.md in the docs folder.
+**Remember**: Always think ultra hard and use proper mcp tools and sub-agents when needed, also remember to plan reading docs wisely, some are way too long with your limited context window. For requirements, always think proactively first and always articulate the reasoning process step by step—identify which parts of the existing system this new change will affect. For implementation, always analyze how we can ensure the new feature implementation integrates perfectly with the existing system and ensure the new system is robust and complete. Meanwhile, please ask me questions at any time to ensure our expectations for the system are aligned. We not only need to implement this new feature but also ensure its interaction with other system components is perfect. After implementation, please update todo.md in the root directory.
 
 ## 🎯 Core Directives
 
@@ -7,387 +7,208 @@ When working here:
 1. **Follow instructions literally** - don't assume or improvise unless explicitly told
 2. **Ask for clarification** when requirements are ambiguous
 3. **Report what you're doing** before executing complex operations
-
+4. **Always analyze and plan before acting.**
 ## 📍 Workspace Routing System
 
-### How Routing Works
-```
-User Input → Analyze Requirements → Search & Assess Current State → Create Implementation Plan → Execute in Target Workspace
-```
-
-### Routing Workflow
-
-**CRITICAL**: This is NOT keyword-based routing. You must analyze and plan before acting.
-
-#### Phase 1: Requirement Analysis
-When receiving any task, FIRST:
-1. **Identify the core requirement** - What does the user actually want to achieve?
-2. **Determine scope** - Which parts of the codebase will be affected?
-3. **List success criteria** - How will we know the task is complete?
-
-#### Phase 2: Current State Assessment
-Before any implementation:
-1. **Create search plan** - List all files/directories that might be relevant
-2. **Execute search and read files**
-3. **Document current implementation**
-   - What already exists?
-   - What patterns are being used?
-   - What can be reused?
-
-#### Phase 3: Implementation Planning
-Based on assessment, create an execution plan and then confirm with me:
-1. **Identify target workspace(s)** - Where will changes be made?
-2. **Load relevant CLAUDE.md files** - Get workspace-specific rules
-3. **Create task list** with specific order and a todo.md file in the root
-
-#### Phase 4: Execution
-Only NOW do you start implementation:
-1. **Announce plan to user** - "Based on analysis, I'll need to modify X files..."
-2. **Load workspace CLAUDE.md** - `[workspace]/CLAUDE.md`
-3. **Execute plan step by step** - Follow workspace-specific instructions
-4. **Validate each step** - Run tests, check for errors
-
-### Workspace Reference Table
-
-**Note**: These are NOT trigger keywords. They're reference categories for Phase 3 planning.
-
-| Workspace | Common Indicators | Location | Purpose |
-|-----------|------------------|----------|---------|
-| **UI Layer** | Pages, React components, shadcn/ui, styling, user interactions | `src/app/(dashboard)/`, `src/components/` | 7 main pages, 28 React components |
-| **API Layer** | RESTful endpoints, request validation, route handlers | `src/app/api/` | 18 API endpoints (libraries, prompts, templates, images, sync, health) |
-| **Business Logic** | Template Engine, AI Providers, generators, sync management | `src/lib/` | Core logic: engines, providers, generators, sync, stitcher, utils |
-| **Database** | Prisma schema, migrations, seed data, database queries | `prisma/` | 7 models (Library, Record, Prompt, ImageVariant, Template, ImageBatch), 4 enums |
-| **Validation** | Zod schemas for API requests/responses, data validation | `src/schemas/` | 5 schema files (library, prompt, image, template, api) |
-| **Testing** | Unit tests, integration tests, E2E tests | `tests/` | Unit (engines, generators), Integration (API), E2E (Playwright) |
-| **Documentation** | Architecture docs, TODO tracking, API mapping | `docs/` | REFACTOR.md, REFRACTOR_TODO.md, API_MAPPING.md, DATABASE_SCHEMA.md |
+### Core Principle (must follow step by step, do not skip!!!)
+**CRITICAL**:  User Input → Analyze Requirements → Assess Current State → Plan → Execute in Target Workspace - git commit
+### Standard Flow (Do NOT skip phases)
+**Phase 1: Requirement Analysis**
+1. Identify core requirement - What does user actually want?
+2. Determine scope - Which parts affected?
+3. Define success criteria - How to verify completion?
+**Phase 2: Current State Assessment**
+1. Create search plan - List relevant files/directories
+2. Execute search and read files
+3. Document current implementation - What exists? What patterns? What's reusable?
+**Phase 3: Implementation Planning**
+1. Identify target workspace(s)
+2. Load relevant CLAUDE.md files
+3. Create ordered task list + root `todo.md`
+4. **Confirm plan with user before proceeding**
+**Phase 4: Execution**
+1. Announce plan - "Based on analysis, I'll modify X files..."
+2. Execute step by step - Follow workspace-specific rules
+3. Validate each step - Run tests, check errors
+4. Git commit with proper comment.
 
 ### Technology Stack
-
 - **Framework**: Next.js 16.0.3 with App Router + Turbopack
 - **Language**: TypeScript 5.6.3 (strict mode enabled)
 - **Runtime**: React 19.2.0 (Server Components + Client Components)
-- **Database**: PostgreSQL 16-alpine (Docker) + Prisma ORM 6.0.0
-- **UI Library**: shadcn/ui (22 components installed) built on Radix UI
-- **Styling**: Tailwind CSS 3.4.15 with CSS variables theming
-- **State Management**: React Query (TanStack Query) for server state caching
+- **Database**: PostgreSQL 16-alpine + Prisma 6.0.0 (ORM) + Atlas 0.38.1 (migrations)
+- **Styling**: Tailwind CSS 3.4.15 + shadcn/ui (22 components)
+- **State Management**: React Query (TanStack Query 5.x) for server state
 - **Validation**: Zod 3.23+ for runtime type validation
-- **Image Processing**: sharp 0.33+ for image stitching and manipulation
-- **AI Providers**: Google Gemini & ByteDance (REST API wrappers)
-- **Testing**:
-  - Vitest 2.1.6 for unit tests
-  - Playwright 1.48.2 for E2E tests
-  - Integration tests for API endpoints
-- **Code Quality**: ESLint 9 (flat config) + Prettier 3.3
-- **Development**: Turbopack for fast HMR (374ms startup time)
+- **Testing**: Vitest 2.1.6 (unit) + Playwright 1.48.2 (E2E)
+- **Command Runner**: Just 1.43.1
+
+### Key Architecture Patterns
+- **Three-Layer Architecture**: Frontend (React) → API Layer (Next.js Routes) → Data Layer (Prisma)
+- **Component Structure**: Feature-based with shadcn/ui primitives (`/src/components/ui/`, `/src/components/library/`, etc.)
+- **State Management**: React Query for server state caching, URL params for shareable state
+- **API Communication**: Next.js API Routes with Zod validation, unified `{success, data, message}` responses
+- **Styling Strategy**: Tailwind CSS + CSS variables for theming (dark/light mode)
+- **Error Handling**: Centralized ErrorLogger + ErrorClassifier, API error responses with codes
+- **Performance**: Turbopack HMR (374ms), code splitting, dynamic imports for Monaco Editor
 
 ### Project Structure
-
 ```
 promptgen-next/
 ├── prisma/
-│   ├── schema.prisma              # 7 models, 4 enums (170 LOC)
-│   ├── migrations/                # Database migrations
-│   └── seed.ts                    # Seed data (6 libraries, 14 entries, 2 system templates)
-│
+│   ├── schema.prisma          # 8 models, 4 enums (Prisma schema)
+│   └── seed.ts                # Database seeding script
+├── atlas/
+│   └── migrations/            # Atlas SQL migrations
 ├── src/
-│   ├── app/                       # Next.js App Router
-│   │   ├── (dashboard)/          # Dashboard route group (shared layout)
-│   │   │   ├── page.tsx          # Dashboard home
-│   │   │   ├── libraries/        # Library management (list, create, edit, delete)
-│   │   │   ├── prompts/          # Prompt generation (main, diff, batch)
-│   │   │   ├── images/           # Image management (batch generation, versions)
-│   │   │   ├── templates/        # Template editor (Monaco integration)
-│   │   │   ├── status/           # System status & health checks
-│   │   │   └── settings/         # System settings
-│   │   ├── api/                  # API Routes (18 endpoints)
-│   │   │   ├── libraries/        # 6 endpoints (list/get/create/update/delete/config)
-│   │   │   ├── prompts/
-│   │   │   │   ├── generate-main/    # Main prompt generation
-│   │   │   │   ├── generate-diff/    # Diff prompt generation
-│   │   │   │   └── batch/            # Batch generation
-│   │   │   ├── templates/        # Template CRUD + validation
-│   │   │   ├── images/           # Image generation & stitching
-│   │   │   ├── sync/             # Sync management (check, repair)
-│   │   │   ├── providers/        # Provider health & stats
-│   │   │   └── health/           # System health check
-│   │   ├── layout.tsx            # Root layout
-│   │   └── globals.css           # Global styles (Tailwind)
-│   │
-│   ├── components/               # React components (28 total)
-│   │   ├── ui/                  # shadcn/ui components (22 installed)
-│   │   │   ├── button.tsx, card.tsx, dialog.tsx, form.tsx, input.tsx
-│   │   │   ├── select.tsx, table.tsx, tabs.tsx, toast.tsx, etc.
-│   │   ├── library/             # Library management components
-│   │   │   ├── LibraryTable.tsx, LibraryForm.tsx, LibraryFilter.tsx
-│   │   ├── prompt/              # Prompt generation components
-│   │   │   ├── PromptCard.tsx, BatchGenerationDialog.tsx
-│   │   ├── template/            # Template editor components
-│   │   │   └── TemplateEditor.tsx (Monaco integration)
-│   │   └── shared/              # Shared components
-│   │       ├── LoadingSpinner.tsx, ErrorMessage.tsx, ConfirmDialog.tsx
-│   │
-│   ├── lib/                      # Core business logic (~4,526 LOC)
-│   │   ├── db/                  # Database client
-│   │   │   └── prisma.ts        # Prisma singleton
-│   │   ├── engines/             # Template engines
-│   │   │   ├── template-engine.ts        # Main template (7 modules, 39 variables)
-│   │   │   ├── diff-template-engine.ts   # Diff template (45 variables, 7 namespaces)
-│   │   │   ├── parser.ts                 # Template parser ({{}} syntax)
-│   │   │   └── filters.ts                # Filters (join, join:)
-│   │   ├── providers/           # AI Providers (Phase 4 - pending)
-│   │   │   ├── base.ts                   # Provider interface
-│   │   │   ├── gemini.ts                 # Gemini Provider
-│   │   │   ├── bytedance.ts              # ByteDance Provider
-│   │   │   └── provider-manager.ts       # Fallback manager
-│   │   ├── generators/          # Generators (Phase 4 - pending)
-│   │   │   ├── prompt-generator.ts       # Main prompt generation
-│   │   │   ├── diff-prompt-generator.ts  # Diff prompt generation
-│   │   │   ├── image-generator.ts        # 3-round image generation
-│   │   │   ├── combo-manager.ts          # Combination enumeration
-│   │   │   └── batch-generator.ts        # Batch coordination
-│   │   ├── sync/                # Sync management (Phase 5 - pending)
-│   │   │   └── sync-manager.ts           # 8 checkers + auto repair
-│   │   ├── stitcher/            # Image stitching (Phase 4 - pending)
-│   │   │   ├── image-stitcher.ts         # sharp-based stitching
-│   │   │   ├── text-overlay.ts           # Multi-language text
-│   │   │   └── languages.ts              # 7 language configs
-│   │   └── utils/               # Utility functions
-│   │       ├── id-generator.ts           # Image ID generation/parsing
-│   │       ├── file-manager.ts           # File operations
-│   │       ├── cache.ts                  # LRU cache
-│   │       ├── errors.ts                 # Custom error classes
-│   │       └── logger.ts                 # Logging utilities
-│   │
-│   ├── schemas/                  # Zod validation (~500 LOC)
-│   │   ├── library.schema.ts             # Library schemas
-│   │   ├── prompt.schema.ts              # Prompt schemas
-│   │   ├── image.schema.ts               # Image schemas
-│   │   ├── template.schema.ts            # Template schemas
-│   │   └── api.schema.ts                 # API request/response schemas
-│   │
-│   ├── types/                    # TypeScript type definitions
-│   │   ├── library.types.ts, prompt.types.ts, image.types.ts
-│   │   ├── template.types.ts, provider.types.ts, api.types.ts
-│   │
-│   ├── config/                   # Configuration files
-│   │   ├── library-config.ts             # Library metadata (6 libraries)
-│   │   ├── languages.ts                  # 7 language configs
-│   │   └── constants.ts                  # Global constants
-│   │
-│   └── middleware.ts             # Next.js middleware (optional)
-│
-├── tests/                        # Test suite
-│   ├── unit/                    # Unit tests
-│   │   ├── engines/             # Template engine tests
-│   │   ├── generators/          # Generator tests
-│   │   └── utils/               # Utility tests
-│   ├── integration/             # Integration tests (12 passing)
-│   │   └── api/                 # API endpoint tests
-│   └── e2e/                     # E2E tests (Playwright)
-│       ├── library-management.spec.ts
-│       ├── prompt-generation.spec.ts
-│       └── image-generation.spec.ts
-│
-├── docs/                         # Documentation
-│   ├── REFACTOR.md              # Full architecture design (2000+ lines)
-│   ├── REFRACTOR_TODO.md        # Task tracking checklist
-│   ├── DATABASE_SCHEMA.md       # Prisma schema details
-│   ├── API_MAPPING.md           # Flask → Next.js API mapping
-│   └── LEGACY_FLASK_REFERENCE.md # Flask system reference
-│
-├── public/
-│   ├── images/                  # Generated images (organized by imageId)
-│   └── favicon.svg              # Favicon
-│
-├── scripts/                      # Utility scripts
-│   ├── migrate-libraries.ts     # Migrate 6 libraries from JSON
-│   └── seed-database.ts         # Database seeding
-│
-├── .env.example                  # Environment variables template
-├── next.config.ts                # Next.js config (remotePatterns for images)
-├── tsconfig.json                 # TypeScript config (strict mode)
-├── tailwind.config.ts            # Tailwind CSS config
-├── components.json               # shadcn/ui config
-├── vitest.config.ts              # Vitest config
-├── playwright.config.ts          # Playwright config
-├── package.json                  # Dependencies
-└── README.md                     # Project README
+│   ├── app/                   # Next.js App Router
+│   │   ├── (dashboard)/       # Dashboard route group (7 pages)
+│   │   │   ├── page.tsx       # Dashboard home
+│   │   │   ├── libraries/     # Library management
+│   │   │   ├── prompts/       # Prompt generation
+│   │   │   ├── combinations/  # Combination management
+│   │   │   ├── images/        # Image management
+│   │   │   ├── templates/     # Template editor
+│   │   │   └── status/        # System status
+│   │   └── api/               # API Routes (35+ endpoints)
+│   ├── components/            # React components
+│   │   ├── ui/                # shadcn/ui components (22)
+│   │   ├── library/           # Library management components
+│   │   ├── prompt/            # Prompt generation components
+│   │   ├── combinations/      # Combination components
+│   │   └── shared/            # Shared components
+│   ├── hooks/                 # React Query hooks
+│   ├── lib/                   # Core business logic (~4,500 LOC)
+│   │   ├── db/                # Prisma client singleton
+│   │   ├── engines/           # Template engines (main + diff)
+│   │   ├── generators/        # Prompt/image generators
+│   │   ├── providers/         # AI providers (Gemini, ByteDance)
+│   │   ├── sync/              # 8 sync checkers
+│   │   └── utils/             # Utilities (logger, errors, cache)
+│   └── schemas/               # Zod validation schemas
+├── docs/                      # Documentation
+│   └── todo.md                # Task tracking
+├── tests/                     # Test files
+└── justfile                   # Just command runner recipes
 ```
 
-### Key Architecture Patterns
+## 🛠️ Build, Test & Development
+### Common Commands
+Run `just` to see all available commands. Key commands:
 
-**Three-Layer Architecture**:
-- **Frontend Layer** (`src/app/`, `src/components/`): React 19 Server Components by default, Client Components only for interactivity
-- **API Layer** (`src/app/api/`): 18 RESTful endpoints with Zod validation, unified success/error responses
-- **Data Layer** (`src/lib/db/`): Prisma ORM with 7 models, connection pooling, transaction support
+| Task | Command | Purpose |
+|------|---------|---------|
+| **Setup** | `just setup` | First-time setup (deps + docker + migrations + seed) |
+| **Install deps** | `just install` | Install npm packages |
+| **Dev server** | `just dev` | Start dev server (Turbopack, http://localhost:3000) |
+| **Build** | `just build` | Production build (prisma generate + next build) |
+| **Test all** | `just test` | Run all tests |
+| **Test unit** | `just test-unit` | Run Vitest unit tests |
+| **Test E2E** | `just test-e2e` | Run Playwright E2E tests |
+| **Lint** | `just lint` | ESLint check |
+| **Type check** | `just type-check` | TypeScript validation |
+| **Full check** | `just check` | lint + type-check + format-check |
 
-**Template Engine System**:
-- **Syntax**: Supports `{{@module:character}}` (predefined modules) and `{{library.field}}` (direct field access)
-- **7 Modules**: character, pose, scene, theme, lighting, style, composition
-- **Variables**: 39 variables for main templates, 45 variables for diff templates (7 namespaces)
-- **Filters**: `{{field | join}}`, `{{field | join: ', '}}` for array formatting
-- **Diff Templates**: 7 namespaces (main, outfit_state, new_outfit_state, color_changes, decorations, new_decorations, all_decorations)
+### Development Workflow
+**First time**: `just setup` (installs deps, starts Docker, applies migrations, seeds DB)
+**Daily**: `just docker-up` → `just dev` → Make changes → `just check` before commit
+**Pre-commit (REQUIRED)**: Run `just build` to verify compilation
 
-**AI Provider Management**:
-- **Provider Interface**: IImageProvider with generate() and healthCheck() methods
-- **Fallback Chain**: ProviderManager with configurable fallback (Gemini → ByteDance)
-- **Attempt Tracking**: Record provider attempts in database for analytics
-- **Health Monitoring**: Periodic health checks with automatic provider switching
+### Database Commands
+| Command | Purpose |
+|---------|---------|
+| `just docker-up` | Start PostgreSQL + Redis containers |
+| `just docker-down` | Stop containers |
+| `just db-studio` | Open Prisma Studio GUI |
+| `just db-shell` | Connect to PostgreSQL shell |
+| `just db-seed` | Seed database with test data |
 
-**3-Round Image Generation Flow**:
-1. **Round 1**: Generate main image using main prompt (English)
-2. **Round 2**: Generate diff image using diff prompt + main image as context (same provider required)
-3. **Round 3**: Stitch final images with multi-language text overlay (7 languages: en, fr, ja, ko, de, es, zh)
+### ⚠️ Critical Rules
+1. **Build before PR** - Always verify `just build` passes
+2. **Type check** - Run `just type-check` before committing
+3. **Use Just commands** - Prefer `just <cmd>` over raw npm commands
+4. **Docker required** - Database runs in Docker container
 
-**Data Model Design**:
-- **Library**: 6 types (character, pose, scene, theme, style, decorative_props) with JSON entries
-- **Record**: Tracks imageId, libraryIds, outfit state, decorations, prompts, variants
-- **Prompt**: Main/Diff prompts in Chinese and English
-- **ImageVariant**: Version management (v1, v2, v3...) with multiple language outputs
-- **Template**: System/User templates with category (MAIN/DIFF)
-- **ImageBatch**: Batch generation tracking with progress updates
 
-**API Design Patterns**:
-- **Request Validation**: Zod schemas for all API inputs
-- **Response Format**: Unified `{success, data, message}` for success, `{success: false, error: {code, message, details}}` for errors
-- **Error Codes**: VALIDATION_ERROR, NOT_FOUND, INTERNAL_ERROR
-- **Endpoint Organization**: RESTful with logical grouping (libraries, prompts, templates, images, sync, providers, health)
-
-**Component Strategy**:
-- **Server Components**: Default for static content and data fetching (Dashboard, library lists, stats)
-- **Client Components**: Used only for interactivity ('use client' directive) - forms, dialogs, editors
-- **shadcn/ui**: 22 pre-installed components (Button, Card, Dialog, Form, Input, Select, Table, Tabs, Toast, etc.)
-- **Dynamic Imports**: Monaco Editor loaded with `dynamic(() => import(), { ssr: false })` to avoid SSR issues
-
-**State Management**:
-- **React Query**: Server state caching with automatic refetching and invalidation
-- **React Context**: Minimal usage, prefer React Query for server state
-- **URL State**: Search params and route params for shareable state
-
-**Business Logic Isolation**:
-- **Framework-Agnostic**: All core logic in `src/lib/` (no Next.js dependencies)
-- **Testable**: Pure TypeScript functions and classes
-- **Reusable**: Can be used in API routes, Server Actions, or CLI scripts
-
-**Error Handling & Recovery**:
-- **Provider Fallback**: Automatic retry with alternative providers
-- **Database Transactions**: Atomic operations for data consistency
-- **Error Boundaries**: React error boundaries for UI error containment
-- **Attempt Logging**: All provider attempts logged in providerAttempts JSON field
-
-**Performance Optimizations**:
-- **Code Splitting**: Dynamic imports for heavy components (Monaco Editor)
-- **Image Optimization**: Next.js Image component with remotePatterns configuration
-- **Database Indexing**: Composite indexes on frequently queried fields (imageId, libraryIds)
-- **Turbopack**: Fast HMR in development (374ms startup)
-- **LRU Cache**: In-memory caching for frequently accessed data
-
-**Code Organization Principles**:
-- **Colocation**: Related files grouped by feature (library/, prompt/, template/)
-- **Separation of Concerns**: UI, API, Business Logic, Database in distinct layers
-- **Type Safety**: TypeScript strict mode, Prisma-generated types, Zod runtime validation
-- **Consistency**: Unified naming conventions, file structure, error handling patterns
-
-## 💻 Development Workflow
-
-### Setup Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Development server (Turbopack, 374ms startup)
-npm run dev              # http://localhost:3000
-
-# Database operations
-npm run db:studio        # Open Prisma Studio UI (database GUI)
-npm run db:migrate       # Run database migrations
-npm run db:seed          # Seed database with test data (6 libraries, 14 entries, 2 templates)
-npm run db:push          # Push schema changes to database (dev only)
-npm run db:generate      # Generate Prisma Client
-
-# Build & Production
-npm run build            # Build Next.js application for production
-npm start               # Start production server
-
-# Testing
-npm test                # Run all tests (unit + integration)
-npm run test:unit       # Run unit tests (Vitest)
-npm run test:e2e        # Run E2E tests (Playwright)
-npm run test:integration # Run integration tests (API endpoints)
-npm run test:watch      # Run tests in watch mode
-
-# Code Quality
-npm run lint            # Run ESLint (flat config)
-npm run lint:fix        # Auto-fix linting issues
-npm run type-check      # TypeScript type checking
-npm run format          # Format code with Prettier
-npm run format:check    # Check code formatting
-
-# Utility Scripts
-npm run migrate-libraries  # Migrate 6 libraries from JSON to database (one-time)
-npm run consistency-test   # Test Template Engine output consistency with Python version
+## 🗄️ Database Migration Workflow
+### Core Principle
 ```
-
-## Git Workflow (Before Making Changes)
-
-**ALWAYS execute these checks first:**
-
-1. **Verify current branch**
-   ```bash
-   git branch --show-current
-   ```
-
-2. **Add unsaved file and commit with correct comment **
-   ```bash
-   git add .
-   git commit -m "related comment to the change"
-   ```
-
-### Commit Message Format
+Prisma Schema → Atlas Migration → PostgreSQL → Prisma Client
+(prisma/schema.prisma)  (atlas/migrations/)   (Docker)    (generated)
 ```
-type(scope): subject
-```
+**Single source of truth**: `prisma/schema.prisma` - 🚫 Never edit migrations manually - ✅ All changes traceable via Atlas - ✅ Prisma only for ORM generation
 
-**Types**:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, missing semicolons, etc.)
-- `refactor`: Code refactoring without changing functionality
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
+### Standard Flow (Do NOT skip steps)
+1. **Edit schema**: `prisma/schema.prisma` (add/modify models)
+2. **Generate migration**: `just db-diff descriptive_name`
+3. **Review SQL**: Check generated file in `atlas/migrations/`
+4. **Apply migration**: `just db-apply`
+5. **Verify status**: `just db-status`
+6. **Generate Prisma Client**: `just prisma-generate`
+7. **Test**: Verify changes work in application
 
-## 🐛 Debugging Instructions
+### Key Commands
+| Command | Purpose |
+|---------|---------|
+| `just db-status` | Show migration status |
+| `just db-diff <name>` | Create new migration from schema changes |
+| `just db-apply` | Apply pending migrations |
+| `just db-apply-dry` | Preview what would be applied |
+| `just db-lint` | Check for issues in migrations |
+| `just db-validate` | Validate migrations |
+| `just prisma-generate` | Regenerate Prisma Client |
+| `just prisma-validate` | Validate Prisma schema |
 
-### Debug Workflow
+### Database Models (8 total)
+- **Combination**: Library combination tracking
+- **Library**: 6 library types (character, pose, scene, theme, style, decorative_props)
+- **Record**: Generation records with variants
+- **Prompt**: Main/Diff prompts (CN + EN)
+- **ImageVariant**: Version management with multi-language outputs
+- **Template**: System/User templates (MAIN/DIFF categories)
+- **ImageBatch**: Batch generation tracking
+- **ErrorLog**: Error tracking and analysis
 
-1. Error Collection : Browser errors via Chrome DevTools MCP and Playwright MCP
-2. Documentation Research : Query official docs via Context7 mcp
-3. Solution Planning : Create fix plan based on findings
-4. User Confirmation:
-**MUST present findings before fixing:**
-```
-Found: [error] caused by [root cause]
-Official docs recommend: [solution]
-I need to change: [specific changes]
-May I proceed?
-```
-5. Implementation
-Only after approval, implement fixes and verify using Chrome/Playwright tools.
+
+## 💅 Coding Style & Naming
+### Format & Lint
+- **Auto-format**: Run `just format` (Prettier) before commit
+- **Linter**: ESLint 9 (flat config) - run `just lint`
+- **Indentation**: 2 spaces (TypeScript/TSX/JSON)
+
+### Naming Conventions
+| Element | Convention | Example |
+|---------|-----------|---------|
+| **Variables/Functions** | camelCase | `getUserData`, `handleSubmit` |
+| **React Components** | PascalCase | `LibraryTable`, `PromptCard` |
+| **Files** | kebab-case | `library-table.tsx`, `use-libraries.ts` |
+| **Directories** | kebab-case | `components/library/`, `hooks/` |
+| **Constants** | UPPER_SNAKE_CASE | `API_BASE_URL`, `MAX_RETRIES` |
+| **Types/Interfaces** | PascalCase | `Library`, `PromptGenerateRequest` |
+| **Zod Schemas** | camelCase + Schema suffix | `librarySchema`, `promptRequestSchema` |
+
+### Code Organization
+- **API Routes**: `src/app/api/` - RESTful endpoints with Zod validation
+- **Components**: `src/components/` - Feature-based folders (library/, prompt/, ui/)
+- **Hooks**: `src/hooks/` - React Query hooks (use-libraries.ts, use-prompts.ts)
+- **Business Logic**: `src/lib/` - Framework-agnostic, testable (engines/, generators/, providers/)
+- **Schemas**: `src/schemas/` - Zod validation schemas
+- **Import ordering**: React/Next → 3rd party → Internal (@/lib, @/components)
+
+### Project-Specific Rules
+- **Server Components**: Default for pages, use `'use client'` only when needed
+- **Client Components**: Forms, dialogs, editors with interactivity
+- **API Responses**: Always return `{success: boolean, data?: T, message?: string, error?: {...}}`
+- **shadcn/ui**: Use existing UI components before building custom
+
 
 ## UI/UX design
-
 ### Design Principles
-
 - Comprehensive design checklist in `/context/design-principles.md`
 - Brand style guide in `/context/style-guide.md`
 - When making visual (front-end, UI/UX) changes, always refer to these files for guidance
-
 ### Quick Visual Check
-
 IMMEDIATELY after implementing any front-end change:
-
 1. **Identify what changed** – Review the modified components/pages
 2. **Navigate to affected pages** – Use `mcp__playwright__browser_navigate` to visit each changed view
 3. **Verify design compliance** – Compare against `/context/design-principles.md` and `/context/style-guide.md`
@@ -395,41 +216,108 @@ IMMEDIATELY after implementing any front-end change:
 5. **Check acceptance criteria** – Review any provided context files or requirements
 6. **Capture evidence** – Take full page screenshot at desktop viewport (1440px) of each changed view
 7. **Check for errors** – Run `mcp__playwright__browser_console_messages`
-
 This verification ensures changes meet design standards and user requirements.
+### Component Library
+| Config | Value |
+|--------|-------|
+| **Library** | shadcn/ui (22 components installed) |
+| **Base** | Radix UI primitives |
+| **Components Path** | `/src/components/ui/` |
+| **Styling** | Tailwind CSS 3.4.15 + CSS variables |
+| **Icons** | Lucide React |
+| **Theme** | CSS variables (dark/light mode support) |
+| **Editor** | Monaco Editor (code/JSON editing) |
 
-### Comprehensive Design Review
+### Installed shadcn/ui Components
+`accordion`, `alert-dialog`, `avatar`, `button`, `card`, `checkbox`, `command`, `dialog`, `dropdown-menu`, `form`, `input`, `label`, `popover`, `progress`, `radio-group`, `scroll-area`, `select`, `separator`, `switch`, `tabs`, `toast`, `tooltip`
 
-Invoke the `@agent-design-review` subagent for thorough design validation when:
-- Completing significant UI/UX features
-- Before finalizing PRs with visual changes
-- Needing comprehensive accessibility and responsiveness testing
+### Usage Rules
+- ✅ Use shadcn/ui components first before building custom
+- ✅ Follow Radix UI composition patterns
+- ✅ Extend via wrapper components when needed
+- ✅ Use Monaco Editor for code/JSON editing (dynamic import with SSR disabled)
+- 🚫 Don't modify `/src/components/ui/` source files directly
 
-### shadcn/ui Components
+## 🧪 Testing Guidelines
+### Test Commands
+| Command | Purpose |
+|---------|---------|
+| `just test` | Run all tests (Vitest) |
+| `just test-unit` | Run unit tests only |
+| `just test-unit-watch` | Run unit tests in watch mode |
+| `just test-e2e` | Run Playwright E2E tests |
+| `just test-e2e-ui` | Run E2E tests with Playwright UI |
 
-- Modern component library built on Radix UI primitives
-- Components in `/src/components/ui/`
-- Tailwind CSS v4 with CSS variables for theming
-- Lucide React icons throughout
+### Test Organization
+- **Unit Tests**: `tests/unit/` - Template engines, generators, utilities
+- **Integration Tests**: `tests/integration/` - API endpoint tests (12 passing)
+- **E2E Tests**: `tests/e2e/` - Playwright browser tests
 
-## ⚠️ Critical Rules
+### Coverage Priorities
+**Focus on**: Template engine output consistency, API response formats, Zod validation, business logic (generators, combo-manager)
+**Don't test**: shadcn/ui components, Prisma Client internals, third-party libraries
 
-**NEVER DO THESE**:
-1. ❌ Delete files without explicit permission
-2. ❌ Modify core configuration without discussion
-3. ❌ Commit sensitive data (passwords, API keys)
-4. ❌ Force push to main branch
-5. ❌ Ignore failing tests
-6. ❌ Use `any` type in TypeScript without comment explaining why
-7. ❌ Copy-paste code without understanding it
-8. ❌ Make assumptions about business logic
+### Current Test Status
+- Integration tests: 12/12 passing
+- Unit tests: Pending expansion (Phase 6)
+- E2E tests: Pending expansion (Phase 6)
 
-**ALWAYS DO THESE**:
-1. ✅ Read error messages completely before fixing
-2. ✅ Test your changes locally
-3. ✅ Keep commits atomic and focused
-4. ✅ Update documentation when changing APIs
-5. ✅ Ask for clarification when unsure
-6. ✅ Report blockers immediately
-7. ✅ Follow existing patterns in codebase
-8. ✅ Consider edge cases and error states
+### ⚠️ Rules
+- ✅ Run `just test` before committing significant changes
+- ✅ Add tests for bug fixes (regression prevention)
+- ✅ Test API endpoints with Zod schema validation
+- 🚫 Don't mock Prisma in integration tests (use test database)
+
+## 📝 Git Commit & PR Guidelines
+### Commit Message Format
+```
+<type>(<scope>): <subject>
+Example: feat(auth): 添加JWT token刷新机制
+```
+**Types**: `feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
+### Standard Flow
+1. **Commit after every change** - Don't leave uncommitted files
+2. **Write clear message** - Present tense, reference issue IDs (e.g., `feat(api): add user endpoint #123`)
+3. **Create PR with**:
+   - Concise description of change
+   - Testing evidence (command output/screenshots)
+   - Notes on config/schema updates
+4. **Request reviews** - Both backend & frontend owners for shared contracts
+### Key Rules
+- ✅ Commit frequently, push often
+- ✅ Use conventional commit format
+- ✅ Include testing proof in PRs
+- 🚫 Mix unrelated changes in one commit
+
+
+## 🔄 API Development Workflow
+### Core Principle
+This project uses **Next.js API Routes** with **Zod validation** instead of OpenAPI.
+```
+Zod Schema → API Route → React Query Hook → Component
+(src/schemas/)  (src/app/api/)  (src/hooks/)     (src/components/)
+```
+**Single Source of Truth**: Zod schemas in `src/schemas/` - ✅ Runtime validation - ✅ TypeScript inference - ✅ No code generation needed
+
+### Adding New API Endpoints
+1. **Define Zod schema**: Add request/response schemas to `src/schemas/`
+2. **Create API route**: Add route handler in `src/app/api/`
+3. **Add React Query hook**: Create hook in `src/hooks/`
+4. **Use in component**: Import hook and use in component
+5. **Test**: Add integration test in `tests/integration/`
+
+### API Response Format
+All endpoints use unified response format:
+```typescript
+// Success
+{ success: true, data: T, message?: string }
+
+// Error
+{ success: false, error: { code: string, message: string, details?: any } }
+```
+
+### Error Codes
+- `VALIDATION_ERROR`: Zod validation failed
+- `NOT_FOUND`: Resource not found
+- `INTERNAL_ERROR`: Server error
+- `PROVIDER_ERROR`: AI provider failure
