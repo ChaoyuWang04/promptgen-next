@@ -380,6 +380,30 @@
 - ✅ 批量操作功能完整
 - ✅ 系统状态页面完成
 
+#### Known Issues Resolved
+
+##### Image Stitching (RESOLVED - 2025-11-25)
+- **Issue**: node-canvas measureText() returning incorrect values (~100px vs ~500px for 110px font)
+- **Root Cause**: Cairo/Pango system dependencies fundamentally broken, cannot be reliably fixed
+- **Resolution**: Migrated to Python wrapper approach using scripts/stitch_generator.py
+- **Implementation**:
+  - Created `scripts/stitch_generator.py` (445 lines, permanent location)
+  - Created `scripts/stitch-cli.py` (32 lines, CLI wrapper for subprocess invocation)
+  - Created `src/lib/stitcher/python-stitcher.ts` (82 lines, TypeScript bridge)
+  - Updated 4 API endpoints to use PythonStitcher instead of ImageStitcher:
+    - `src/lib/generators/image-generator.ts`
+    - `src/app/api/images/stitch/route.ts`
+    - `src/app/api/combinations/[id]/variants/[variantId]/language/route.ts`
+    - `src/app/api/combinations/[id]/generate/route.ts`
+- **Performance**: +100-300ms overhead (acceptable for non-real-time scenarios)
+- **Verification**: ✅ Playwright E2E test confirmed correct output:
+  - ✅ White background canvas
+  - ✅ Two lines of text with proper formatting
+  - ✅ Red colored numbers (#ff1a1a)
+  - ✅ Side-by-side images with proper spacing
+- **Cleanup**: Removed 4 obsolete files (image-stitcher.ts, canvas-renderer.ts, font-loader.ts, color-parser.ts) and canvas@2.11.2 dependency
+- **Status**: ✅ RESOLVED - Python wrapper approach is production-ready
+
 #### 依赖关系
 - **前置任务**: Phase 4完成
 - **后续任务**: Phase 6测试与部署

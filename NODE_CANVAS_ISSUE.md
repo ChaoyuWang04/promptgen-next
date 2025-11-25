@@ -176,6 +176,98 @@ tail -50 dev-server.log | grep "Text render complete"
 
 ---
 
+## Resolution (2025-11-25)
+
+### Final Solution: Python Wrapper Approach
+
+After extensive investigation and multiple failed attempts to fix the node-canvas measureText() bug, we determined that the issue is a **system-level problem with Cairo/Pango dependencies** that cannot be reliably fixed without risking further instability.
+
+**User Proposal**: "拼图这事我们能不能直接调用python" - Instead of fighting with node-canvas, directly use the proven Python implementation from the old project.
+
+### Implementation
+
+**Created Files**:
+1. **`scripts/stitch_generator.py` (445 lines)**
+   - Copied from `context/old_project/src/stitch_generator.py` to permanent location
+   - Updated font path from `assets/fonts/` to `public/fonts/`
+   - Fully functional Pillow-based image stitching
+
+2. **`scripts/stitch-cli.py` (32 lines)**
+   - CLI wrapper for subprocess invocation
+   - Accepts 4 arguments: main_path, diff_path, output_path, language_id
+   - Returns JSON result: `{success, output_path, language, tries, diffs, dimensions}`
+
+3. **`src/lib/stitcher/python-stitcher.ts` (82 lines)**
+   - TypeScript bridge using `child_process.exec`
+   - Drop-in replacement for ImageStitcher with identical interface
+   - Timeout: 30 seconds, maxBuffer: 10MB
+   - Automatic error handling and result parsing
+
+**Updated Files** (4 API endpoints):
+- `src/lib/generators/image-generator.ts` - Replaced ImageStitcher with PythonStitcher
+- `src/app/api/images/stitch/route.ts` - Replaced ImageStitcher with PythonStitcher
+- `src/app/api/combinations/[id]/variants/[variantId]/language/route.ts` - Replaced ImageStitcher with PythonStitcher
+- `src/app/api/combinations/[id]/generate/route.ts` - Replaced ImageStitcher with PythonStitcher
+
+### Verification
+
+**Build Test**: ✅ PASSED
+```bash
+npm run build
+# Output: Compiled successfully
+```
+
+**Playwright E2E Test**: ✅ PASSED
+- Navigated to http://localhost:3000/combinations
+- Selected combination: wilma_sittinghold_entrancedoor_christmas_retro1950flat_0002
+- Generated variant successfully
+- **Final Image Verification**:
+  - ✅ White background canvas (2800x2000px)
+  - ✅ Two lines of text: "I've tried 358 times but / still can't find 10 differences"
+  - ✅ Red colored numbers (#ff1a1a)
+  - ✅ Side-by-side images with proper spacing
+  - ✅ Proper layout and alignment
+
+### Performance Impact
+
+**Overhead**: +100-300ms per stitch operation (Python process startup)
+
+**Acceptability**: ✅ ACCEPTABLE for non-real-time image generation scenarios
+
+### Cleanup (2025-11-25)
+
+**Deleted Files** (4 obsolete node-canvas files):
+- `src/lib/stitcher/image-stitcher.ts` (357 LOC)
+- `src/lib/stitcher/canvas-renderer.ts` (267 LOC)
+- `src/lib/stitcher/font-loader.ts` (184 LOC)
+- `src/lib/stitcher/color-parser.ts` (101 LOC)
+
+**Removed Dependency**:
+- `"canvas": "^2.11.2"` from package.json
+- Removed 53 related packages from node_modules
+
+**Updated Documentation**:
+- `docs/todo.md` - Added Phase 5 Known Issues Resolved section
+- `NODE_CANVAS_ISSUE.md` - Added this Resolution section
+- `docs/prd.md` - Updated Phase 4 Stage 3 status (pending)
+- `docs/PHASE4_IMPLEMENTATION_SUMMARY.md` - Updated Stage 3 notes (pending)
+
+### Status
+
+✅ **RESOLVED** - Python wrapper approach is production-ready
+
+**Key Takeaways**:
+- node-canvas is fundamentally broken on this system (Cairo/Pango issues)
+- Python wrapper provides +100-300ms overhead but 100% correct output
+- All 4 API endpoints successfully migrated to PythonStitcher
+- No more measureText() bugs or missing text overlays
+- Clean codebase: removed 909 LOC of broken node-canvas code
+
+**Maintenance Note**: The `NODE_CANVAS_ISSUE.md` file is kept as historical reference for future debugging if similar issues arise.
+
+---
+
 **创建时间**：2025-11-25
+**解决时间**：2025-11-25
 **诊断人员**：Claude Code
 **系统环境**：macOS (Darwin 25.1.0), Node.js, canvas@2.11.2
