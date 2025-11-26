@@ -178,6 +178,7 @@ export function useGenerateSingle() {
 
 /**
  * Hook to generate batch of images
+ * Starts batch generation and returns batchId for progress tracking
  */
 export function useGenerateBatch() {
   const queryClient = useQueryClient();
@@ -186,27 +187,19 @@ export function useGenerateBatch() {
   return useMutation({
     mutationFn: (request: GenerateBatchRequest) =>
       api.post<{
-        success: boolean;
-        data: {
-          batchId: string;
-          totalImages: number;
-          completed: number;
-          failed: number;
-          durationMs: number;
-          errors: Array<{ imageId: string; error: string }>;
-        };
-        message: string;
+        batchId: string;
+        totalImages: number;
+        status: string;
+        queuedJobs: number;
       }>('/api/images/generate/batch', request),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.images.batches() });
-      toast({
-        title: 'Batch Generation Complete',
-        description: `${response.data.completed}/${response.data.totalImages} succeeded, ${response.data.failed} failed`,
-      });
+      // Don't show toast here - let the caller handle it
+      // This allows customized messages based on context
     },
     onError: (error: Error) => {
       toast({
-        title: 'Batch Generation Failed',
+        title: '批量生成失败',
         description: error.message,
         variant: 'destructive',
       });

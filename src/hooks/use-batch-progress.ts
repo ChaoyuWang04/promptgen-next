@@ -27,10 +27,11 @@ export function useBatchProgress(batchId: string | null) {
   return useQuery<BatchProgress>({
     queryKey: queryKeys.images.batchProgress(batchId || ''),
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: BatchProgress }>(
+      // api.get() already unwraps data.data, so we get BatchProgress directly
+      const response = await api.get<BatchProgress>(
         `/api/images/generate/batch/${batchId}`
       );
-      return response.data;
+      return response;
     },
     enabled: !!batchId,
     refetchInterval: (query) => {

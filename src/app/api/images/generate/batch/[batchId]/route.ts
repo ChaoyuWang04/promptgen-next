@@ -30,13 +30,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Get batch status (includes real-time queue status)
     const status = await batchGenerator.getBatchStatus(batchId);
 
+    // Calculate progress percentage
+    const progress =
+      status.totalImages > 0
+        ? Math.round((status.completed / status.totalImages) * 100)
+        : 0;
+
     console.log(
-      `[API] Batch ${batchId} status: ${status.status} (${status.completed + status.failed}/${status.totalImages})`
+      `[API] Batch ${batchId} status: ${status.status} (${status.completed + status.failed}/${status.totalImages}) - ${progress}%`
     );
+
+    // Transform to match the expected BatchProgress interface
+    const response = {
+      batchId: status.batchId,
+      totalImages: status.totalImages,
+      completed: status.completed,
+      failed: status.failed,
+      status: status.status,
+      progress,
+      createdAt: status.createdAt.toISOString(),
+      updatedAt: status.updatedAt.toISOString(),
+    };
 
     return NextResponse.json({
       success: true,
-      data: status,
+      data: response,
     });
   } catch (error) {
     console.error('[API] Batch status error:', error);

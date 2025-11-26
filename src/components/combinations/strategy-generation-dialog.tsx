@@ -346,8 +346,8 @@ export function StrategyGenerationDialog({
       });
 
       // Notify parent about batch started
-      if (onBatchStarted && batchResult.data?.batchId) {
-        onBatchStarted(batchResult.data.batchId);
+      if (onBatchStarted && batchResult?.batchId) {
+        onBatchStarted(batchResult.batchId);
       }
 
       toast({
