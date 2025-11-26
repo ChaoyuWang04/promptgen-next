@@ -87,35 +87,11 @@ async function main() {
     console.log(`  Style: ${context.style.era_style}\n`);
 
     // Render template
-    const rendered = renderTemplate(template.content, context, {
-      enable_modules: false, // Test variable rendering only
-    });
+    const rendered = renderTemplate(template.content, context);
 
     console.log('✅ Rendered Result:');
     console.log('─'.repeat(80));
     console.log(rendered);
-    console.log('─'.repeat(80) + '\n');
-
-    // Test module rendering
-    console.log('🔧 Testing module rendering...');
-
-    const moduleTemplate = `{{@module:character}}
-
-{{@module:pose}}
-
-{{@module:scene}}
-
-{{@module:theme}}
-
-{{@module:style}}`;
-
-    const moduleRendered = renderTemplate(moduleTemplate, context, {
-      enable_modules: true,
-    });
-
-    console.log('✅ Module Rendered Result:');
-    console.log('─'.repeat(80));
-    console.log(moduleRendered);
     console.log('─'.repeat(80) + '\n');
 
     console.log('✅ Template engine test completed successfully!');

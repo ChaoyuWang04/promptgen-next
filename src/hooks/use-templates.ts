@@ -39,7 +39,6 @@ export interface TemplateVariablesResponse {
 export interface PreviewRequest {
   content: string;
   library_ids: Record<string, string>;
-  enable_modules?: boolean;
 }
 
 export interface PreviewResponse {

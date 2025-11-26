@@ -2,7 +2,7 @@
  * Template Parser Utility
  *
  * Parses template content to extract library dependencies.
- * Supports: {{library.field}} syntax (NOT {{@module:xxx}})
+ * Supports: {{library.field}} syntax
  *
  * Used for automatic library detection in strategy generation.
  */
@@ -25,8 +25,7 @@ export function extractLibrariesFromTemplate(content: string): LibraryName[] {
   }
 
   // Regular expression to match {{library.field}} syntax
-  // Matches: {{word.word}} but NOT {{@module:word}}
-  const variablePattern = /\{\{(?!@)([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\|[^}]*)?\}\}/g;
+  const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\|[^}]*)?\}\}/g;
 
   const libraries = new Set<LibraryName>();
   let match: RegExpExecArray | null;
@@ -78,7 +77,7 @@ export function countVariableReferences(content: string): number {
     return 0;
   }
 
-  const variablePattern = /\{\{(?!@)([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\|[^}]*)?\}\}/g;
+  const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\|[^}]*)?\}\}/g;
   const matches = content.match(variablePattern);
 
   return matches ? matches.length : 0;
@@ -109,7 +108,7 @@ export function extractVariableDetails(content: string): VariableReference[] {
     return [];
   }
 
-  const variablePattern = /\{\{(?!@)([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\|[^}]*)?\}\}/g;
+  const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\|[^}]*)?\}\}/g;
   const variables: VariableReference[] = [];
   let match: RegExpExecArray | null;
 

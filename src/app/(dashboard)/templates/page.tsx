@@ -333,7 +333,7 @@ export default function TemplatesPage() {
       setSelectedTemplate(newTemplate.id);
       const defaultContent =
         newTemplateCategory === 'MAIN'
-          ? '// 在此处编写主模板内容\n// 使用 {{@module:variable}} 引用预定义模块\n// 使用 {{library.field}} 直接访问库字段\n\n角色: {{@character:name}}\n姿势: {{@pose:description}}\n场景: {{@scene:description}}\n'
+          ? '// 在此处编写主模板内容\n// 使用 {{library.field}} 直接访问库字段\n// 使用 {{array | join}} 格式化数组\n\n角色: {{character.name}}\n姿势: {{pose.description}}\n场景: {{scene.description}}\n'
           : '// 在此处编写差分模板内容\n// 使用 {{main.variable}} 引用主提示词变量\n// 使用 {{new_variable}} 引用新状态变量\n\n基于主提示词修改:\n{{main.character}}\n新增装饰: {{new_decorations.items}}\n';
       setEditorContent(defaultContent);
       setOriginalContent(defaultContent);

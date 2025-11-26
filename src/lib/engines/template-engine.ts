@@ -1,12 +1,9 @@
 /**
  * Template Engine Core
  *
- * Hybrid template system supporting:
- * 1. Module syntax: {{@module:character}}
- * 2. Variable access: {{character.name}}, {{pose.emotion}}
- * 3. Filters: {{array | join}}, {{array | join: ', '}}
- *
- * Achieves 100% output parity with Flask Python version.
+ * Template system supporting:
+ * 1. Variable access: {{character.name}}, {{pose.emotion}}
+ * 2. Filters: {{array | join}}, {{array | join: ', '}}
  */
 
 import {
@@ -16,16 +13,6 @@ import {
   type FilterFunction,
   type VariableMetadata,
 } from './types';
-
-import {
-  CharacterModule,
-  PoseModule,
-  SceneModule,
-  ThemeModule,
-  LightingModule,
-  StyleModule,
-  CompositionModule,
-} from './modules';
 
 /**
  * Built-in filter functions
@@ -86,19 +73,6 @@ const BUILT_IN_FILTERS: Record<string, FilterFunction> = {
 };
 
 /**
- * Module registry
- */
-const MODULE_REGISTRY = {
-  character: CharacterModule,
-  pose: PoseModule,
-  scene: SceneModule,
-  theme: ThemeModule,
-  lighting: LightingModule,
-  style: StyleModule,
-  composition: CompositionModule,
-};
-
-/**
  * Template Engine Class
  */
 export class TemplateEngine {
@@ -121,51 +95,10 @@ export class TemplateEngine {
     context: TemplateContext,
     options: TemplateRenderOptions = {}
   ): string {
-    const { strict = false, enable_modules = true } = options;
+    const { strict = false } = options;
 
-    // First, replace module calls {{@module:xxx}}
-    let rendered = template;
-
-    if (enable_modules) {
-      rendered = this.renderModules(rendered, context, strict);
-    }
-
-    // Then, replace variable expressions {{xxx.yyy | filter}}
-    rendered = this.renderVariables(rendered, context, strict);
-
-    return rendered;
-  }
-
-  /**
-   * Render module expressions: {{@module:name}}
-   */
-  private renderModules(
-    template: string,
-    context: TemplateContext,
-    strict: boolean
-  ): string {
-    const moduleRegex = /\{\{@module:(\w+)\}\}/g;
-
-    return template.replace(moduleRegex, (match, moduleName) => {
-      const module = MODULE_REGISTRY[moduleName as keyof typeof MODULE_REGISTRY];
-
-      if (!module) {
-        if (strict) {
-          throw new Error(`Unknown module: ${moduleName}`);
-        }
-        return match; // Keep original if not strict
-      }
-
-      try {
-        return module.build(context);
-      } catch (error) {
-        if (strict) {
-          throw error;
-        }
-        console.warn(`Module ${moduleName} failed:`, error);
-        return '';
-      }
-    });
+    // Replace variable expressions {{xxx.yyy | filter}}
+    return this.renderVariables(template, context, strict);
   }
 
   /**
@@ -180,11 +113,6 @@ export class TemplateEngine {
     const variableRegex = /\{\{([^}]+)\}\}/g;
 
     return template.replace(variableRegex, (match, expression) => {
-      // Skip if already processed (starts with @)
-      if (expression.trim().startsWith('@')) {
-        return match;
-      }
-
       try {
         return this.evaluateExpression(expression.trim(), context, strict);
       } catch (error) {
@@ -298,50 +226,36 @@ export class TemplateEngine {
         const expression = match[1].trim();
         const column = match.index + 1;
 
-        // Check module syntax
-        if (expression.startsWith('@module:')) {
-          const moduleName = expression.substring(8);
+        // Check variable expression
+        const parts = expression.split('|').map(p => p.trim());
+        const variablePath = parts[0];
 
-          if (!MODULE_REGISTRY[moduleName as keyof typeof MODULE_REGISTRY]) {
-            errors.push({
+        // Validate variable path format (no validation of actual existence)
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/.test(variablePath)) {
+          errors.push({
+            line: lineNum,
+            column,
+            message: `Invalid variable path: ${variablePath}`,
+            variable: expression,
+          });
+        }
+
+        // Check filters
+        const filterExpressions = parts.slice(1);
+        for (const filterExpr of filterExpressions) {
+          const colonIndex = filterExpr.indexOf(':');
+          const filterName =
+            colonIndex !== -1
+              ? filterExpr.substring(0, colonIndex).trim()
+              : filterExpr;
+
+          if (!this.filters[filterName]) {
+            warnings.push({
               line: lineNum,
               column,
-              message: `Unknown module: ${moduleName}`,
+              message: `Unknown filter: ${filterName}`,
               variable: expression,
             });
-          }
-        } else {
-          // Check variable expression
-          const parts = expression.split('|').map(p => p.trim());
-          const variablePath = parts[0];
-
-          // Validate variable path format (no validation of actual existence)
-          if (!/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/.test(variablePath)) {
-            errors.push({
-              line: lineNum,
-              column,
-              message: `Invalid variable path: ${variablePath}`,
-              variable: expression,
-            });
-          }
-
-          // Check filters
-          const filterExpressions = parts.slice(1);
-          for (const filterExpr of filterExpressions) {
-            const colonIndex = filterExpr.indexOf(':');
-            const filterName =
-              colonIndex !== -1
-                ? filterExpr.substring(0, colonIndex).trim()
-                : filterExpr;
-
-            if (!this.filters[filterName]) {
-              warnings.push({
-                line: lineNum,
-                column,
-                message: `Unknown filter: ${filterName}`,
-                variable: expression,
-              });
-            }
           }
         }
       }
@@ -395,16 +309,6 @@ export class TemplateEngine {
           });
         }
       }
-    }
-
-    // Add module shortcuts
-    const modules = Object.keys(MODULE_REGISTRY);
-    for (const moduleName of modules) {
-      variables.push({
-        path: `@module:${moduleName}`,
-        type: 'string',
-        description: `${moduleName} module (auto-generated segment)`,
-      });
     }
 
     return variables;

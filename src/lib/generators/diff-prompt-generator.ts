@@ -274,7 +274,6 @@ export async function generateDiffPrompt(
 
   // Render template
   const promptCn = renderTemplate(template.content, context as any, {
-    enable_modules: false,
     strict: false,
   });
 

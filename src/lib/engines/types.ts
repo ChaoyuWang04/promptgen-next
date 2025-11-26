@@ -50,17 +50,6 @@ export interface TemplateContext {
   theme: Record<string, any>;
   style: Record<string, any>;
   decorative_props?: Record<string, any>;
-
-  // Module outputs (when using {{@module:xxx}} syntax)
-  modules?: {
-    character?: string;
-    pose?: string;
-    scene?: string;
-    theme?: string;
-    style?: string;
-    lighting?: string;
-    composition?: string;
-  };
 }
 
 /**
@@ -106,26 +95,6 @@ export interface DiffTemplateContext extends TemplateContext {
   }>;
 
   all_decorations: string[];
-}
-
-/**
- * Module builder interface
- *
- * Each module builder takes library data and generates a prompt segment.
- */
-export interface ModuleBuilder {
-  /**
-   * Module name
-   */
-  name: string;
-
-  /**
-   * Build prompt segment
-   *
-   * @param context - Template context with all library data
-   * @returns Generated prompt segment
-   */
-  build(context: TemplateContext): string;
 }
 
 /**
@@ -196,11 +165,6 @@ export interface TemplateRenderOptions {
    * If false, undefined variables render as empty string
    */
   strict?: boolean;
-
-  /**
-   * Enable module system ({{@module:xxx}})
-   */
-  enable_modules?: boolean;
 
   /**
    * Custom filters to register

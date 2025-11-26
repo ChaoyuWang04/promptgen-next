@@ -139,29 +139,6 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
     }
   }
 
-  // Add module shortcuts (only for MAIN templates)
-  if (!category || category === 'MAIN') {
-    const modules = [
-      { name: 'character', desc: '角色模块 - 完整角色描述（组合多个字段）' },
-      { name: 'pose', desc: '姿态模块 - 完整姿态描述（组合多个字段）' },
-      { name: 'scene', desc: '场景模块 - 完整场景描述（组合多个字段）' },
-      { name: 'theme', desc: '主题模块 - 完整主题描述（组合多个字段）' },
-      { name: 'lighting', desc: '光照模块 - 完整光照描述（从相关字段生成）' },
-      { name: 'style', desc: '画风模块 - 完整画风描述（组合多个字段）' },
-      { name: 'composition', desc: '构图模块 - 构图规则（从相关字段生成）' },
-    ];
-
-    for (const module of modules) {
-      variables.push({
-        name: `@module:${module.name}`,
-        type: 'string',
-        description: module.desc,
-        example: `{{@module:${module.name}}}`,
-        category: 'MAIN',
-      });
-    }
-  }
-
   // Add DIFF-specific variables
   if (!category || category === 'DIFF') {
     const diffVariables = [

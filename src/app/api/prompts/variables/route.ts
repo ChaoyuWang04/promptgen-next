@@ -64,27 +64,6 @@ async function generateVariableMetadata(): Promise<VariableMetadata[]> {
     }
   }
 
-  // Add module shortcuts
-  const modules = [
-    { name: 'character', desc: '角色模块 - 完整角色描述' },
-    { name: 'pose', desc: '姿态模块 - 完整姿态描述' },
-    { name: 'scene', desc: '场景模块 - 完整场景描述' },
-    { name: 'theme', desc: '主题模块 - 完整主题描述' },
-    { name: 'lighting', desc: '光照模块 - 光照描述' },
-    { name: 'style', desc: '画风模块 - 完整画风描述' },
-    { name: 'composition', desc: '构图模块 - 构图规则' },
-  ];
-
-  for (const module of modules) {
-    variables.push({
-      path: `@module:${module.name}`,
-      type: 'string',
-      description: module.desc,
-      example: `{{@module:${module.name}}}`,
-      requires_filter: false,
-    });
-  }
-
   return variables;
 }
 

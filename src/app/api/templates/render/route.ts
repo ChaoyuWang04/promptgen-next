@@ -20,7 +20,6 @@ export const dynamic = 'force-dynamic';
 interface RenderTemplateRequest {
   content: string;
   library_ids: LibrarySelection;
-  enable_modules?: boolean;
 }
 
 /**
@@ -103,7 +102,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { content, library_ids, enable_modules = true } = body;
+    const { content, library_ids } = body;
 
     // Validate required libraries
     const requiredLibraries = ['character', 'pose', 'scene', 'theme', 'style'];
@@ -126,7 +125,6 @@ export async function POST(request: NextRequest) {
 
     // Render template
     const rendered = renderTemplate(content, context, {
-      enable_modules,
       strict: false,
     });
 

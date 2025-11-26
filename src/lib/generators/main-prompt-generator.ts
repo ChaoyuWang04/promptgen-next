@@ -143,7 +143,6 @@ export async function generateMainPrompt(
 
   // Render template
   const promptCn = renderTemplate(template.content, context, {
-    enable_modules: true,
     strict: false,
   });
 

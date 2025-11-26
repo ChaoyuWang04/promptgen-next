@@ -5,7 +5,6 @@
  *
  * Supports:
  * - Library field access: {{character.name}}, {{pose.emotion}}
- * - Module references: {{@module:character}}
  * - Filters: | join, | uppercase
  */
 
@@ -13,7 +12,7 @@ import type * as Monaco from 'monaco-editor';
 
 // Type for variable from API
 export interface TemplateVariable {
-  name: string;      // e.g., "character.name", "@module:character"
+  name: string;      // e.g., "character.name"
   type: string;      // e.g., "string", "array<string>"
   description: string;
   example?: string;
@@ -25,17 +24,6 @@ export interface LibraryField {
   type: string;
   description: string;
 }
-
-// Module names for {{@module:xxx}} syntax
-export const MODULES = [
-  { name: 'character', description: '角色模块' },
-  { name: 'pose', description: '姿态模块' },
-  { name: 'scene', description: '场景模块' },
-  { name: 'theme', description: '主题模块' },
-  { name: 'lighting', description: '光照模块' },
-  { name: 'style', description: '画风模块' },
-  { name: 'composition', description: '构图模块' },
-];
 
 // Available filters
 export const FILTERS = [
@@ -57,11 +45,6 @@ export function parseVariablesToFields(variables: TemplateVariable[]): Record<st
   const fields: Record<string, LibraryField[]> = {};
 
   for (const variable of variables) {
-    // Skip module references (e.g., "@module:character")
-    if (variable.name.startsWith('@')) {
-      continue;
-    }
-
     // Parse "library.field" format
     const dotIndex = variable.name.indexOf('.');
     if (dotIndex === -1) {
@@ -101,7 +84,7 @@ export function createTemplateAutocomplete(
   const libraryNames = Object.keys(libraryFields);
 
   return monaco.languages.registerCompletionItemProvider('plaintext', {
-    triggerCharacters: ['.', '{', '@', ':', '|'],
+    triggerCharacters: ['.', '{', '|'],
 
     provideCompletionItems(model, position) {
       const textUntilPosition = model.getValueInRange({
@@ -141,22 +124,6 @@ export function createTemplateAutocomplete(
         return { suggestions };
       }
 
-      // Check for module reference: {{@module:
-      const moduleMatch = textUntilPosition.match(/\{\{@module:$/);
-      if (moduleMatch) {
-        MODULES.forEach((module) => {
-          suggestions.push({
-            label: module.name,
-            kind: monaco.languages.CompletionItemKind.Module,
-            insertText: module.name + '}}',
-            detail: 'Module',
-            documentation: module.description,
-            range,
-          });
-        });
-        return { suggestions };
-      }
-
       // Check for filter: {{variable |
       const filterMatch = textUntilPosition.match(/\{\{[^}]+\|\s*$/);
       if (filterMatch) {
@@ -188,30 +155,6 @@ export function createTemplateAutocomplete(
           });
         });
 
-        // Suggest @module syntax
-        suggestions.push({
-          label: '@module',
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: '@module:',
-          detail: 'Module Reference',
-          documentation: '引用预定义模块',
-          range,
-        });
-
-        return { suggestions };
-      }
-
-      // Check for @ after {{
-      const atMatch = textUntilPosition.match(/\{\{@$/);
-      if (atMatch) {
-        suggestions.push({
-          label: 'module:',
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: 'module:',
-          detail: 'Module Reference',
-          documentation: '引用预定义模块',
-          range,
-        });
         return { suggestions };
       }
 
