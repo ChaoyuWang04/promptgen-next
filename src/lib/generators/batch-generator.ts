@@ -86,6 +86,9 @@ export class BatchGenerator {
     console.log(`[BatchGenerator] Created batch ${batch.id}`);
 
     try {
+      // Track successful imageIds (only queue jobs for these)
+      const successfulImageIds: string[] = [];
+
       // Ensure Records and Prompts exist for all imageIds before queuing jobs
       for (const imageId of imageIds) {
         try {
@@ -178,19 +181,22 @@ export class BatchGenerator {
           }
 
           console.log(`[BatchGenerator] Prompts ready for ${imageId}`);
+
+          // Track successful imageId
+          successfulImageIds.push(imageId);
         } catch (error) {
           console.error(
             `[BatchGenerator] Failed to prepare prompts for ${imageId}:`,
             error
           );
-          // Continue with next image
+          // Continue with next image (don't add to successfulImageIds)
         }
       }
 
-      // Add all jobs to the queue
+      // Add jobs to the queue (only for successful imageIds)
       const jobIds = await addBatchImageGenerationJobs(
         batch.id,
-        imageIds,
+        successfulImageIds,
         languageIds
       );
 
@@ -203,12 +209,12 @@ export class BatchGenerator {
       });
 
       console.log(
-        `[BatchGenerator] Added ${jobIds.length} jobs to queue for batch ${batch.id}`
+        `[BatchGenerator] Added ${jobIds.length} jobs to queue for batch ${batch.id} (${successfulImageIds.length}/${imageIds.length} images prepared)`
       );
 
       return {
         batchId: batch.id,
-        totalImages: imageIds.length,
+        totalImages: successfulImageIds.length,
         status: 'IN_PROGRESS',
         queuedJobs: jobIds.length,
       };
