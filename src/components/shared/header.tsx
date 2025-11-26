@@ -28,7 +28,6 @@ const routeNames: Record<string, string> = {
   '/': '仪表板',
   '/libraries': '库管理',
   '/prompts': 'Prompt生成',
-  '/images': '图片管理',
   '/templates': '模板编辑器',
   '/status': '系统状态',
   '/settings': '设置',

@@ -46,11 +46,6 @@ const navItems: NavItem[] = [
     icon: Sparkles,
   },
   {
-    title: '图片管理',
-    href: '/images',
-    icon: Image,
-  },
-  {
     title: '组合管理',
     href: '/combinations',
     icon: Layers,

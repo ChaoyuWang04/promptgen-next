@@ -82,12 +82,6 @@ export default function DashboardPage() {
           description={`${stats.records.withPrompts}个含Prompt`}
         />
         <StatCard
-          title="图片总数"
-          value={formatNumber(stats.images.total)}
-          icon={Image}
-          description={`完成率: ${imageCompletionRate}`}
-        />
-        <StatCard
           title="模板"
           value={formatNumber(stats.templates.total)}
           icon={FileCode2}
@@ -143,7 +137,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="pt-4">
-              <Link href="/images">
+              <Link href="/combinations">
                 <Button className="w-full">
                   管理图片
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -226,12 +220,6 @@ export default function DashboardPage() {
             <Button variant="outline" className="w-full justify-start">
               <FileText className="mr-2 h-4 w-4" />
               生成Prompt
-            </Button>
-          </Link>
-          <Link href="/images">
-            <Button variant="outline" className="w-full justify-start">
-              <Image className="mr-2 h-4 w-4" />
-              批量生图
             </Button>
           </Link>
           <Link href="/templates">
