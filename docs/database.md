@@ -2,22 +2,22 @@
 
 ## Overview
 
-PostgreSQL database managed via Prisma ORM with Atlas migrations. Contains 8 models and 5 enums.
+PostgreSQL + Prisma ORM with Atlas migrations. Models reflect dynamic libraries and prompt/image pipeline.
 
 ---
 
 ## Models
 
 ### Combination
-Central entity linking library selections to templates for generating image sets.
+Central entity linking library selections to templates for generating image sets. Templates can be null for strategy-only combos.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | id | String (CUID) | Primary key |
 | combinationKey | String | Unique identifier (e.g., `betty_christmas_entrance`) |
 | libraryIds | JSON | Selected library entry IDs |
-| mainTemplateId | String | FK to main prompt template |
-| diffTemplateId | String | FK to diff prompt template |
+| mainTemplateId | String? | FK to main prompt template |
+| diffTemplateId | String? | FK to diff prompt template |
 | strategyConfig | JSON? | Optional dynamic strategy configuration |
 | createdAt/updatedAt | DateTime | Timestamps |
 
@@ -26,7 +26,7 @@ Central entity linking library selections to templates for generating image sets
 ---
 
 ### Library
-Stores reusable data libraries (character, pose, scene, theme, style, decorative_props).
+Stores reusable data libraries (e.g., character, pose, scene, theme, style, decorative_prop).
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -36,12 +36,14 @@ Stores reusable data libraries (character, pose, scene, theme, style, decorative
 | description | String? | Optional description |
 | displayField | String | Field to show in UI (default: "name") |
 | category | LibraryCategory | MAIN or DIFF |
-| order | Int | Display order |
+| abbreviation | String? | Used for imageId building |
+| isRequired | Boolean | Required for prompt generation |
+| order | Int (unique) | Display order |
 | entries | JSON | Library entries data |
 | schema | JSON? | Optional validation schema |
+| schemaVersion | String | Schema version |
 | isActive | Boolean | Enable/disable library |
-| schemaVersion | String? | Schema version tracking |
-| metadata | JSON? | Additional metadata |
+| metadata | JSON? | Additional metadata (e.g., `generatorConfig` for outfit/decoration fields) |
 
 ---
 
@@ -54,12 +56,13 @@ Core generation record tracking one image ID through the generation pipeline.
 | imageId | String | Unique image identifier |
 | combinationId | String? | FK to Combination |
 | libraryIds | JSON | Selected library entries |
-| outfitMinorState | JSON? | Current outfit colors for diff generation |
-| usedDecorations | JSON? | Decorations used from theme/scene |
+| variantNumber | Int | Sequential variant number per combination |
+| outfitMinorState | JSON | Current outfit colors for diff generation |
+| usedDecorations | JSON | Decorations used from theme/scene |
 | promptGenerated | Boolean | Main/diff prompts exist |
 | imageGenerated | Boolean | Images have been generated |
 | providerUsed | String? | AI provider that succeeded |
-| providerAttempts | JSON? | All provider attempt records |
+| providerAttempts | JSON | All provider attempt records |
 | latestVersion | Int | Current variant version number |
 
 **Relations:** Belongs to Combination, has many Prompts, has many ImageVariants
@@ -67,7 +70,7 @@ Core generation record tracking one image ID through the generation pipeline.
 ---
 
 ### Prompt
-Stores generated prompts (main or diff) in Chinese.
+Stores generated prompts (main or diff).
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -75,7 +78,7 @@ Stores generated prompts (main or diff) in Chinese.
 | recordId | String | FK to Record |
 | type | PromptType | MAIN or DIFF |
 | promptCn | String | Chinese language prompt |
-| promptEn | String | English prompt (reserved) |
+| promptEn | String | English prompt (currently placeholder) |
 
 **Relations:** Belongs to Record
 
@@ -121,6 +124,7 @@ Tracks async batch generation jobs.
 |-------|------|-------------|
 | id | String (CUID) | Primary key |
 | imageIds | String[] | Array of image IDs to generate |
+| totalImages | Int | Total images targeted |
 | status | BatchStatus | PENDING, IN_PROGRESS, COMPLETED, FAILED |
 | completed | Int | Count of completed images |
 | failed | Int | Count of failed images |
@@ -138,6 +142,7 @@ Optional error tracking for debugging.
 | id | String (CUID) | Primary key |
 | level | String | ERROR, WARN, INFO |
 | message | String | Error message |
+| stack | String? | Stack trace |
 | context | JSON? | Additional context |
 | createdAt | DateTime | When error occurred |
 
@@ -164,13 +169,7 @@ Optional error tracking for debugging.
 
 ---
 
-## Indexes
-
-- `Combination.combinationKey` - Unique index
-- `Library.name` - Unique index
-- `Record.imageId` - Unique index
-- `Template.name` - Unique index
-- `Record.combinationId` - Foreign key index
+Indexes: `Combination.combinationKey` (unique), `Library.name` (unique), `Library.order` (unique), `Record.imageId` (unique), `Template.name` (unique), FK indexes on combination/template links.
 
 ---
 
@@ -186,4 +185,4 @@ Uses Atlas for migrations with Prisma schema as source of truth:
 
 ## Inspecting Current DB State
 
-- Quick snapshot: Run `just db-snapshot` to export the latest database contents into `context/db-snapshot/`. Start by reading `_summary.md` for record counts and file map. Per-table exports (e.g., `library.json`, `template.json`, `record.json`, `prompt.json`, `image-variant.json`, `image-batch.json`, `error-log.json`, `combination.json`) provide the current rows. Use these snapshots for read-only inspection; no DB access required.
+- Latest snapshot (`context/db-snapshot/_summary.md`, 2025-11-27): 6 libraries (character, decorative_prop, pose, scene, style, theme); 1 USER MAIN template (`test_main`); no combinations/records/prompts/variants/batches/errors. Run `just db-snapshot` to refresh exports (`library.json`, `template.json`, `record.json`, etc.).

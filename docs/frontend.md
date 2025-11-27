@@ -2,104 +2,43 @@
 
 ## Overview
 
-Next.js 16 App Router with React 19, shadcn/ui components, and TanStack Query for state management.
+Next.js 16 App Router + React 19. UI uses shadcn/ui with Tailwind; data fetching via TanStack Query. Routes live under `src/app/(dashboard)/`.
 
 ---
 
 ## Pages
 
-7 main pages in `src/app/(dashboard)/`
-
-| Route | Page | Purpose |
-|-------|------|---------|
-| `/` | Dashboard | System overview, stats, recent activity |
-| `/libraries` | Libraries | Manage 6 library types with entries |
-| `/prompts` | Prompts | Generate main/diff prompts |
-| `/combinations` | Combinations | Manage image combinations, batch operations |
-| `/templates` | Templates | Create/edit prompt templates (Monaco Editor) |
-| `/status` | Status | System health, providers, queue, errors |
-| `/settings` | Settings | System configuration |
+| Route | Purpose |
+|-------|---------|
+| `/` | Dashboard with library/template/record counts + provider success stats |
+| `/libraries` | Sidebar-driven library CRUD; supports create from template, entry dialogs, config dialog |
+| `/prompts` | MAIN prompt generation UI (required libraries); DIFF tab currently informational |
+| `/combinations` | Two-panel list/detail, infinite scroll, strategy generation dialog, batch delete, batch progress bar |
+| `/templates` | Monaco editor, template list, preview/render, variable autocomplete, create/update/delete |
+| `/status` | Health overview, provider status, queue stats, error logs (tabs) |
+| `/settings` | Placeholder settings UI (no persistence yet) |
+| `/images` | Present but empty (no page implementation yet) |
 
 ---
 
 ## Layout Structure
 
-**Root Layout** (`src/app/layout.tsx`)
-- QueryProvider (TanStack Query)
-- Toaster (notifications)
-- Font loading (Inter)
+**Root Layout** (`src/app/layout.tsx`): Inter font, QueryProvider, Toaster, Chinese locale.
 
-**Dashboard Layout** (`src/app/(dashboard)/layout.tsx`)
-- Sidebar (w-64) - Navigation
-- Header - Breadcrumbs, search
-- Main content with ErrorBoundary
+**Dashboard Layout** (`src/app/(dashboard)/layout.tsx`): Persistent Sidebar + Header + ErrorBoundary-wrapped main content (p-6). Command palette placeholder.
 
 ---
 
 ## Component Library
 
-### shadcn/ui (30 components)
-
-Located in `src/components/ui/`
-
-| Category | Components |
-|----------|------------|
-| Form | button, input, textarea, select, checkbox, radio-group, switch, form, label |
-| Layout | card, dialog, sheet, accordion, tabs, separator, scroll-area |
-| Feedback | toast, alert, alert-dialog, skeleton, progress |
-| Navigation | breadcrumb, dropdown-menu |
-| Display | table, badge, avatar, tooltip, popover |
+shadcn/ui components in `src/components/ui/` (buttons, form controls, dialogs, sheet, tabs, table, toast, etc.).
 
 ### Custom Components
 
-**Shared** (`src/components/shared/`)
-
-| Component | Purpose |
-|-----------|---------|
-| Sidebar | Main navigation with 7 items |
-| Header | Top bar with breadcrumbs |
-| ErrorBoundary | Catch rendering errors |
-| LoadingSpinner | Loading indicator |
-| EmptyState | Empty list placeholder |
-| ErrorState | Error display |
-| StatCard | Dashboard stat card |
-
-**Combinations** (`src/components/combinations/`)
-
-| Component | Purpose |
-|-----------|---------|
-| CombinationList | Infinite scroll list with selection |
-| CombinationDetail | Detail panel |
-| VariantCard | Image variant display |
-| StrategyGenerationDialog | 4-step wizard |
-| BatchProgressBar | Batch progress |
-
-**Library** (`src/components/library/`)
-
-| Component | Purpose |
-|-----------|---------|
-| LibraryTable | Searchable entry table |
-| LibrarySidebar | Library list sidebar |
-| LibraryConfigDialog | Configure library settings |
-| CreateLibraryDialog | Create new library |
-| EntryFormDialog | Edit/create entry |
-| EntryDetailDialog | View entry details |
-
-**Monitoring** (`src/components/monitoring/`)
-
-| Component | Purpose |
-|-----------|---------|
-| HealthStatusCard | System health overview |
-| ProviderStatus | AI provider status |
-| QueueStatus | Job queue metrics |
-
-**Errors** (`src/components/errors/`)
-
-| Component | Purpose |
-|-----------|---------|
-| ErrorStats | Error statistics |
-| ErrorLogViewer | View error logs |
-| ErrorFilter | Filter errors |
+Shared (`src/components/shared/`): Sidebar, Header, ErrorBoundary, LoadingSpinner, EmptyState, StatCard.
+Libraries (`src/components/library/`): LibrarySidebar, LibraryTable, CreateLibraryDialog, LibraryConfigDialog, EntryFormDialog, EntryDetailDialog.
+Combinations (`src/components/combinations/`): CombinationList, CombinationDetail, StrategyGenerationDialog, BatchProgressBar, VariantCard.
+Monitoring/Errors (`src/components/monitoring/`, `src/components/errors/`): HealthStatusCard, ProviderStatus, QueueStatus, ErrorStats, ErrorLogViewer, ErrorFilter.
 
 ---
 
@@ -132,7 +71,8 @@ Organized by domain:
 After mutations, invalidate related queries:
 - Create library entry → invalidate libraries
 - Generate prompt → invalidate records, combinations
-- Delete combination → invalidate combinations, records
+- Delete combination → invalidate combinations, records; batch delete triggers same
+- Template save/delete → invalidate templates, template variables
 
 ---
 
@@ -142,13 +82,13 @@ Located in `src/hooks/`
 
 | Hook | Purpose |
 |------|---------|
-| useLibraries | Library CRUD operations |
+| useLibraries | Library config + entry CRUD |
 | usePrompts | Generate main/diff prompts |
-| useCombinations | Infinite list, batch delete |
-| useTemplates | Template CRUD, preview |
-| useImages | Batch generation, stats |
+| useCombinations | Infinite list, batch delete, detail |
+| useTemplates | Template CRUD, preview, variable loading |
+| useImages | Batch generation, stats, progress |
 | useDashboard | Dashboard statistics |
-| useBatchProgress | Real-time progress polling |
+| useBatchProgress | Real-time batch polling |
 | useDebounce | Input debouncing (300ms) |
 | useToast | Toast notifications |
 
@@ -190,10 +130,10 @@ Defined in `src/app/globals.css`:
 
 ### Data Loading
 
-1. Component renders loading skeleton
-2. Hook fetches data via Query
+1. Component renders loading/skeleton
+2. Hook fetches via Query
 3. Conditional render: loading → error → data
-4. Mutations trigger invalidation
+4. Mutations trigger targeted invalidation
 
 ### Infinite Scroll
 

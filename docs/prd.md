@@ -2,7 +2,7 @@
 
 ## Overview
 
-PromptGen is an AI-powered prompt generation and image creation system. It combines reusable library elements with customizable templates to generate bilingual prompts, then uses AI providers to create and process images with multi-language text overlays.
+PromptGen is an AI-powered prompt generation and image creation system. It combines reusable library elements with customizable templates to generate prompts, then uses AI providers to create and stitch images with multilingual overlays.
 
 ---
 
@@ -10,94 +10,41 @@ PromptGen is an AI-powered prompt generation and image creation system. It combi
 
 ### 1. Library Management
 
-Manage 6 types of reusable data libraries:
+Manage reusable data libraries (current snapshot: character, pose, scene, theme, style, decorative_prop). Libraries are DB-driven, can be created from templates or custom schemas.
 
-| Library | Category | Purpose |
-|---------|----------|---------|
-| character | MAIN | Character definitions (appearance, outfit, colors) |
-| pose | MAIN | Body positions and expressions |
-| scene | MAIN | Environment settings |
-| theme | MAIN | Theme elements (mood, decorations, colors) |
-| style | MAIN | Visual style parameters |
-| decorative_props | DIFF | Decorations for diff generation |
-
-**Capabilities:**
-- Create, edit, delete library entries
-- Configure display fields and schemas
-- Bulk import/export
+**Capabilities:** create/edit/delete libraries and entries, configure schema/display field/order/required flag, import/export JSON, auto-generate entry templates, view library templates, reorder libraries.
 
 ### 2. Template System
 
-Two template categories:
+Two categories: MAIN (initial prompt) and DIFF (variation prompt). Types: SYSTEM (read-only) and USER (editable).
 
-| Category | Purpose |
-|----------|---------|
-| MAIN | Generate initial image prompts |
-| DIFF | Generate variation prompts with changes |
-
-**Template Types:**
-- SYSTEM - Built-in, read-only
-- USER - Custom, editable
-
-**Syntax:**
-- Direct field access: `{{character.name}}`
-- Filters: `{{field | join: ', '}}`
+**Tooling:** Monaco editor, autocomplete from `/api/templates/variables`, preview render, template validation, dependency discovery (referenced libraries).
 
 ### 3. Prompt Generation
 
 **Main Prompt:**
-- Select entries from 5 required libraries
-- Render template with selections
-- Output bilingual prompt (Chinese primary)
-- Track outfit state for diff generation
+- Select entries from required libraries (driven by DB `isRequired`)
+- Render template with library context
+- Output prompt (Chinese primary; English placeholder)
+- Track outfit state + decorations for diff generation
 
 **Diff Prompt:**
-- Based on existing main prompt
-- Automatically generate 3 outfit color changes
-- Select 8-9 decorations from theme/scene
-- Track changes for image generation
+- Based on existing MAIN record
+- Generates 3 outfit color changes (metadata-driven outfit field)
+- Picks 8–9 decorations from theme/scene (metadata-driven decoration fields)
+- Updates Record outfit/decoration state
 
 ### 4. Image Generation
 
-**3-Round Flow:**
-
-| Round | Description | Output |
-|-------|-------------|--------|
-| 1 | Generate main image from main prompt | Main image |
-| 2 | Generate diff image using main as context | Diff image |
-| 3 | Stitch final images with text overlay | 7 language variants |
-
-**Supported Languages:**
-- English, French, Japanese, Korean, German, Spanish, Chinese
-
-**AI Providers:**
-- Gemini (primary)
-- ByteDance (fallback)
+3-round flow: MAIN → DIFF (same provider, context image) → stitch 7 language variants. Python stitcher can backfill individual language files on demand. Providers managed via fallback chain (`IMAGE_PROVIDERS`), currently Gemini + ByteDance.
 
 ### 5. Combination Management
 
-**Combination:**
-- Unique set of library selections + templates
-- Generates unique imageId
-- Can have multiple variant versions
-
-**Strategy Generation:**
-- Multi-select library entries
-- Enumerate Cartesian product
-- Batch create combinations
+Combination = library selections + optional templates; generates deterministic combinationKey and imageIds. Strategy generation enumerates Cartesian products; preview before persist; supports batch delete and per-combination variant/language stitching.
 
 ### 6. Batch Processing
 
-**Modes:**
-- All - Generate everything
-- Ungenerated - Only prompts pending
-- Unimaged - Only images pending
-
-**Features:**
-- Async queue-based processing
-- Progress tracking via SSE
-- Configurable concurrency
-- Error handling with continue option
+Batch generation modes: all / ungenerated / unimaged with configurable concurrency and continue-on-error. Tracks ImageBatch record; progress via SSE + batch status endpoint.
 
 ---
 
@@ -105,12 +52,13 @@ Two template categories:
 
 ### Create New Images
 
-1. **Setup Libraries** - Add character, pose, scene, theme, style entries
-2. **Create Templates** - Define main and diff templates
-3. **Generate Combinations** - Use strategy wizard to enumerate combinations
-4. **Generate Prompts** - Create main and diff prompts for combinations
-5. **Generate Images** - Run 3-round image generation
-6. **Review Results** - View generated images with language variants
+1. Configure libraries (from template or custom schema) and entries.
+2. Author MAIN/DIFF templates (preview + validate).
+3. Build combinations (manual or strategy).
+4. Generate MAIN prompt (and DIFF when needed).
+5. Trigger image generation (single or batch) with provider fallback.
+6. Stitch language variants; optionally backfill per language.
+7. Export prompts as JSON/TXT/ZIP if needed.
 
 ### Batch Operations
 
@@ -156,20 +104,17 @@ Two template categories:
 - Queue status
 - File system
 - Memory usage
+- Sync checkers (library config, invalid refs, prompt/image sync, combo status, field integrity, orphan, duplicate)
 
 **Sync Verification:**
-- Library configuration
-- Prompt existence
-- Image file integrity
-- Record relationships
-- Orphan detection
+- Auto repair for flagged issues via `/api/sync/repair`
 
 ---
 
 ## Future Considerations
 
 - English prompt translation
+- Persisted settings UI
 - Additional AI providers
 - Custom stitching layouts
-- Export/import workflows
-- User authentication
+- Auth/roles for admin tooling

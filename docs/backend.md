@@ -2,13 +2,13 @@
 
 ## Overview
 
-Business logic layer in `src/lib/` providing template rendering, prompt generation, AI provider integration, and image processing.
+Business logic in `src/lib/`: DB-driven libraries, template rendering, prompt generation, AI provider orchestration, and image stitching. API routes live in `src/app/api/` and wrap these services.
 
 ---
 
 ## Template Engine
 
-Located in `src/lib/engines/`
+Located in `src/lib/engines/`.
 
 ### Syntax
 
@@ -28,42 +28,42 @@ Located in `src/lib/engines/`
 | `first: N` | Get first N items |
 | `default: value` | Fallback if empty |
 
+Utilities: `validateTemplate` (syntax + variables) and `getAvailableVariables` (used by template UI/API).
+
 ---
 
 ## Prompt Generation
 
-Located in `src/lib/generators/`
+Located in `src/lib/generators/` with dynamic library lookup via `libraryService` (cached DB libraries; respects `metadata.generatorConfig` for outfit/decoration fields).
 
 ### Main Prompt Generator
 
 Generates initial image prompt from library selections.
 
 **Flow:**
-1. Load 5 required libraries (character, pose, scene, theme, style)
-2. Build template context from library entries
-3. Render template using TemplateEngine
-4. Extract outfit_minor_state for diff generation
-5. Extract used_decorations from theme
-6. Generate unique imageId
-7. Save Record + MAIN Prompt to database
+1. Validate selections with `libraryService`.
+2. Build context from all active libraries in selection.
+3. Render MAIN template (default `template_default_v1`).
+4. Extract outfit state + decorations using metadata pointers (`outfitField`, `decorationField`, `additionalDecorationField`).
+5. Generate imageId (ordered by library `order`, uses abbreviations).
+6. Persist Record with MAIN prompt (promptEn placeholder).
 
 ### Diff Prompt Generator
 
 Generates difference prompt for variation images.
 
 **Flow:**
-1. Load existing Record with main prompt data
-2. Generate 3 random outfit color changes
-3. Select 8-9 decorations (prioritizing high-priority items)
-4. Build diff context with changes
-5. Render diff template
-6. Save DIFF Prompt + update Record
+1. Load Record + MAIN prompt.
+2. Normalize outfit data (supports string arrays or structured objects); generate 3 color changes.
+3. Normalize decorations (from metadata-driven fields); pick 8–9 items.
+4. Render DIFF template (default `diff_template_default_v1`).
+5. Save DIFF prompt; update Record outfit state/decoration usage.
 
 ---
 
 ## AI Providers
 
-Located in `src/lib/providers/`
+Located in `src/lib/providers/`. `ProviderManager` builds a fallback chain from `IMAGE_PROVIDERS` (comma list) and records attempts.
 
 ### Provider Interface
 
@@ -90,15 +90,7 @@ All providers implement:
 | Timeout | 60 seconds |
 | Format | URL (downloaded after generation) |
 
-**Note:** ByteDance Round 2 uses saved URL from Round 1 as context.
-
-### Provider Manager
-
-Handles fallback chain and attempt tracking.
-
-- **Fallback Order:** Gemini → ByteDance
-- **Attempt Tracking:** Records all attempts with success/failure
-- **Health Checks:** Periodic availability verification
+**Notes:** Provider for round 2 must match round 1 for context continuity. Attempt history stored per Record.
 
 ---
 
@@ -114,7 +106,7 @@ Located in `src/lib/generators/image-generator.ts`
 | 2 | Generate diff image using same provider + main image as context | `v{N}_diff.png` |
 | 3 | Stitch final images with text overlay (7 languages) | `v{N}_final_{lang}.png` |
 
-**Important:** Round 2 must use same provider as Round 1 for context continuity.
+Stitching uses `PythonStitcher` (also used by `/api/combinations/[id]/variants/[variantId]/language` to backfill a single language).
 
 ### Supported Languages
 
@@ -132,7 +124,7 @@ Located in `src/lib/generators/image-generator.ts`
 
 ## Image Stitching
 
-Located in `src/lib/stitcher/`
+Located in `src/lib/stitcher/`.
 
 Combines main and diff images with narrative text overlay.
 
@@ -147,7 +139,7 @@ Combines main and diff images with narrative text overlay.
 
 ## Batch Processing
 
-Located in `src/lib/generators/batch-generator.ts`
+Located in `src/lib/generators/batch-generator.ts`.
 
 ### Workflow
 
@@ -158,6 +150,7 @@ Located in `src/lib/generators/batch-generator.ts`
 3. Queue jobs to BullMQ
 4. Update batch to IN_PROGRESS
 5. Worker processes jobs asynchronously
+6. Batch status exposed via `/api/images/generate/batch/[batchId]` and `/api/images/batches`
 
 ### Queue Configuration (BullMQ + Redis)
 
@@ -173,7 +166,7 @@ Located in `src/lib/generators/batch-generator.ts`
 
 ## Combination Manager
 
-Located in `src/lib/generators/combo-manager.ts`
+Located in `src/lib/generators/combo-manager.ts`.
 
 Enumerates combinations from strategy configuration.
 
@@ -182,6 +175,7 @@ Enumerates combinations from strategy configuration.
 - Multi-select support for libraries
 - Statistics: total possible, with prompts, with images
 - Find ungenerated/unimaged combinations
+ - Uses library entry names to build combinationKey when missing
 
 ---
 
@@ -212,15 +206,15 @@ Located in `src/lib/utils/`
 
 ### Image ID Generation
 
-Format: `{char}_{pose}_{scene}_{theme}_{style}_{sequence}`
-
-Example: `betty_turnback_living_halloween_retro50s_0001`
+Format: `{lib1}_{lib2}_..._{sequence}` ordered by library `order` with entry abbreviations. Example: `betty_sitting_living_summer_simpson_0001`.
 
 ### Random Utilities
 
 - `randomSample(array, count)` - Pick N items without replacement
 - `selectNewColor(current, pool)` - Pick different color from pool
 - `selectRandomDecorations(theme, scene, count)` - Prioritize high-priority items
+- `generateOutfitChanges(outfitMinor, count)` - Build diff outfit changes
+- `generateCombinationKey(libraryIds, { libraryNames })` - Deterministic combination key
 
 ---
 
@@ -230,4 +224,4 @@ Example: `betty_turnback_living_halloween_retro50s_0001`
 2. **Generate main prompt** → Creates Record + MAIN Prompt
 3. **Generate diff prompt** → Creates DIFF Prompt
 4. **Generate images** → 3-round flow with provider fallback
-5. **Store variants** → ImageVariant with all file paths
+5. **Store variants** → ImageVariant with all file paths; optional per-language backfill via language endpoint

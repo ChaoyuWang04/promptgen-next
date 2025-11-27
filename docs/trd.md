@@ -38,8 +38,7 @@ Variable rendering with filter support: `{{library.field | filter}}`
 ### Provider Fallback Pattern
 
 Sequential provider attempts with fallback:
-1. Try primary provider (Gemini)
-2. On failure, try fallback (ByteDance)
+1. Try providers in `IMAGE_PROVIDERS` order (e.g., Gemini → ByteDance)
 3. Record all attempts for analytics
 
 ### Queue-Based Processing
@@ -151,6 +150,14 @@ All API inputs validated at runtime with Zod schemas.
 ### Atlas Over Prisma Migrate
 
 Atlas for SQL-first migrations with better control over generated SQL.
+
+### Dynamic Library Service
+
+Libraries are DB-driven (order/required/metadata), cached in `libraryService`, and power prompt generators + imageId builder.
+
+### Python Stitcher
+
+`PythonStitcher` stitches MAIN/DIFF images and can backfill single-language variants for existing ImageVariant records.
 
 ### BullMQ for Async Jobs
 

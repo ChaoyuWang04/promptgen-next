@@ -2,7 +2,7 @@
 
 ## Overview
 
-Next.js 16 monorepo with App Router, organized by feature and responsibility.
+Next.js 16 app with App Router, organized by feature and responsibility.
 
 ---
 
@@ -10,13 +10,12 @@ Next.js 16 monorepo with App Router, organized by feature and responsibility.
 
 ```
 promptgen-next/
-├── prisma/                    # Database
-│   ├── schema.prisma          # Prisma schema (source of truth)
-│   ├── migrations/            # Prisma migrations
-│   └── seed.ts                # Database seeding
+├── prisma/                    # Database (Prisma)
+│   ├── schema.prisma          # Schema (source of truth)
+│   └── migrations/            # Prisma migrations
 │
-├── atlas/                     # Atlas migrations
-│   └── migrations/            # Generated SQL migrations
+├── atlas/                     # Atlas migrations (SQL)
+│   └── migrations/
 │
 ├── src/
 │   ├── app/                   # Next.js App Router
@@ -27,20 +26,21 @@ promptgen-next/
 │   │   │   ├── combinations/  # Combination management
 │   │   │   ├── templates/     # Template editor
 │   │   │   ├── status/        # System status
-│   │   │   ├── settings/      # Settings
+│   │   │   ├── settings/      # Settings (placeholder UI)
+│   │   │   ├── images/        # Present but empty
 │   │   │   └── layout.tsx     # Dashboard layout
-│   │   ├── api/               # API routes (43 endpoints)
-│   │   │   ├── libraries/     # Library CRUD
-│   │   │   ├── templates/     # Template CRUD
-│   │   │   ├── prompts/       # Prompt generation
-│   │   │   ├── combinations/  # Combination management
-│   │   │   ├── images/        # Image generation
-│   │   │   ├── records/       # Record management
-│   │   │   ├── sync/          # Sync operations
+│   │   ├── api/               # API routes (45 endpoints)
+│   │   │   ├── libraries/     # Library CRUD/import/export/stats/reorder/templates
+│   │   │   ├── templates/     # Template CRUD/render/validate/variables
+│   │   │   ├── prompts/       # Prompt generation/export
+│   │   │   ├── combinations/  # Combination CRUD/strategy/batch/language
+│   │   │   ├── images/        # Image generation, batches, stats, stitch
+│   │   │   ├── records/       # Record listing + bulk delete
+│   │   │   ├── sync/          # Sync check/repair/history
 │   │   │   ├── providers/     # Provider stats
 │   │   │   ├── health/        # Health check
 │   │   │   ├── queue/         # Queue stats
-│   │   │   └── errors/        # Error logs
+│   │   │   └── errors/        # Error logs and stats
 │   │   ├── layout.tsx         # Root layout
 │   │   └── globals.css        # Global styles
 │   │
@@ -71,7 +71,7 @@ promptgen-next/
 │   │   ├── queue/             # BullMQ queue
 │   │   ├── stitcher/          # Image stitching
 │   │   ├── sync/              # Sync management
-│   │   ├── api/               # API client & query config
+│   │   ├── api/               # Frontend API client & query config
 │   │   └── utils/             # Utilities
 │   │
 │   ├── schemas/               # Zod validation schemas
@@ -103,6 +103,8 @@ promptgen-next/
 │   └── prd.md                 # Product requirements
 │
 ├── scripts/                   # Utility scripts
+├── dev/                       # Dev helpers
+├── temptools/                 # Temporary tooling
 ├── context/                   # Design context files
 │
 ├── .env.example               # Environment template

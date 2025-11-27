@@ -2,201 +2,100 @@
 
 ## Overview
 
-43 RESTful API endpoints organized in `src/app/api/`. All endpoints use Zod validation and return unified response format.
+45 REST endpoints in `src/app/api/`, all Zod-validated and returning:
+- Success: `{ success: true, data, message? }`
+- Error: `{ success: false, error: { code, message, details? } }`
 
-### Response Format
+## Library Management
 
-**Success:** `{ success: true, data: {...}, message?: string }`
-
-**Error:** `{ success: false, error: { code: string, message: string, details?: any } }`
-
-### Error Codes
-
-| Code | HTTP | Description |
-|------|------|-------------|
-| VALIDATION_ERROR | 400 | Invalid request body/params |
-| NOT_FOUND | 404 | Resource doesn't exist |
-| CONFLICT | 409 | Resource already exists |
-| INTERNAL_ERROR | 500 | Server error |
-
----
-
-## Library Management (10 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/libraries` | Create new library |
-| GET | `/api/libraries/config` | Get all library configurations |
-| GET | `/api/libraries/[name]` | Get library entries |
-| POST | `/api/libraries/[name]` | Create entry in library |
-| PUT | `/api/libraries/[name]` | Replace all entries |
-| PATCH | `/api/libraries/[name]` | Update library metadata |
-| DELETE | `/api/libraries/[name]` | Delete library |
-| GET | `/api/libraries/[name]/[id]` | Get single entry |
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| POST | `/api/libraries` | Create library from template or custom schema (auto-order, metadata recorded) |
+| GET | `/api/libraries/config` | DB-driven library list (order, active flag, entry counts, structure type) |
+| GET | `/api/libraries/templates` | Built-in library templates (schema + example entry) |
+| POST | `/api/libraries/reorder` | Swap library order (order is unique) |
+| GET | `/api/libraries/[name]` | List entries (supports search/pagination via query) |
+| POST/PUT/PATCH/DELETE | `/api/libraries/[name]` | Entry CRUD + library metadata update |
+| GET | `/api/libraries/[name]/[id]` | Fetch single entry |
 | PUT | `/api/libraries/[name]/[id]` | Update entry |
 | DELETE | `/api/libraries/[name]/[id]` | Delete entry |
+| GET | `/api/libraries/[name]/stats` | Entry counts, active flag |
+| GET | `/api/libraries/[name]/template` | Auto-generate entry template from existing data |
+| GET | `/api/libraries/[name]/export` | Export entries JSON |
+| POST | `/api/libraries/[name]/import` | Import entries JSON |
+| DELETE | `/api/libraries/[name]/bulk-delete` | Delete multiple entries by ID |
 
-**Key Fields:**
-- `name` - Unique kebab-case identifier
-- `displayName` - Human-readable name
-- `category` - MAIN or DIFF
-- `entries` - JSON data for library elements
+Key fields: `name` (lowercase + underscores), `category` (MAIN/DIFF), `displayField`, `metadata.structureType` (standard/nested_array), generator hints via `metadata.generatorConfig`.
 
----
+## Template Management
 
-## Template Management (7 endpoints)
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| GET/POST | `/api/templates` | List/create templates (SYSTEM read-only) |
+| GET/PUT/DELETE | `/api/templates/[id]` | Read/update/delete (delete only USER) |
+| GET | `/api/templates/[id]/libraries` | Which libraries a template references |
+| POST | `/api/templates/validate` | Syntax + variable validation |
+| POST | `/api/templates/render` | Preview render with sample context |
+| GET | `/api/templates/variables` | Variable list by category (MAIN/DIFF) |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/templates` | List templates (filter by type/category) |
-| POST | `/api/templates` | Create template |
-| GET | `/api/templates/[id]` | Get template |
-| PUT | `/api/templates/[id]` | Update template |
-| DELETE | `/api/templates/[id]` | Delete template (USER only) |
-| GET | `/api/templates/[id]/libraries` | Get template dependencies |
-| POST | `/api/templates/validate` | Validate template content |
-| POST | `/api/templates/render` | Preview template rendering |
-| GET | `/api/templates/variables` | List available variables |
+## Prompt Generation & Export
 
-**Constraints:**
-- SYSTEM templates are read-only
-- Category must be MAIN or DIFF
-- Name must be unique
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| POST | `/api/prompts/generate/main` | Generate MAIN prompt; builds context from active libraries and saves Record + MAIN prompt |
+| POST | `/api/prompts/generate/diff` | Generate DIFF prompt for existing imageId; applies outfit color changes + new decorations |
+| GET | `/api/prompts/variables` | Variable metadata for prompt UI |
+| POST | `/api/prompts/export` | Export prompts as json/txt/zip (optional imageId filter) |
 
----
+Main prompt returns `image_id`, `prompt_cn`, `library_ids`, `outfit_minor_state`, `used_decorations`; DIFF returns `diff_id`, `prompt_cn`, `new_outfit_state`, `new_decorations`.
 
-## Prompt Generation (3 endpoints)
+## Combination Management
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/prompts/generate/main` | Generate main prompt |
-| POST | `/api/prompts/generate/diff` | Generate diff prompt |
-| GET | `/api/prompts/variables` | Get template variables |
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| GET/POST | `/api/combinations` | Paginated list with library/template filters; create single combination (auto key) |
+| POST | `/api/combinations/preview` | Preview strategy enumeration without persisting |
+| POST | `/api/combinations/strategy` | Persist combinations from strategy config |
+| GET/DELETE | `/api/combinations/[id]` | Load combination with records/variants; deep delete (records, prompts, variants, files) |
+| DELETE | `/api/combinations/batch` | Batch delete combinations + files |
+| POST | `/api/combinations/[id]/generate` | Kick off variant generation for one combination |
+| POST | `/api/combinations/[id]/variants/[variantId]/language` | Stitch missing language version for an existing variant |
 
-### Generate Main Prompt
+## Image Generation & Assets
 
-**Required:** library_ids with character, pose, scene, theme, style
-
-**Returns:** imageId, promptCn, promptEn, outfit_minor_state, used_decorations
-
-### Generate Diff Prompt
-
-**Required:** image_id (existing record)
-
-**Returns:** diff_id, promptCn, promptEn, new_outfit_state, new_decorations
-
----
-
-## Combination Management (8 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/combinations` | List combinations (paginated, filterable) |
-| POST | `/api/combinations` | Create single combination |
-| POST | `/api/combinations/strategy` | Generate combinations from strategy |
-| POST | `/api/combinations/preview` | Preview strategy results |
-| GET | `/api/combinations/[id]` | Get combination with records |
-| PUT | `/api/combinations/[id]` | Update combination |
-| DELETE | `/api/combinations/[id]` | Delete combination |
-| DELETE | `/api/combinations/batch` | Batch delete combinations |
-| POST | `/api/combinations/[id]/generate` | Generate variant for combination |
-
-### Strategy Generation (v2)
-
-**Request:**
-- mainTemplateId, diffTemplateId - Template references
-- strategyConfig - Map of library names to entry ID arrays
-
-**Process:** Enumerates Cartesian product of selections, creates combinations, generates imageIds
-
----
-
-## Image Generation (5 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/images/generate/single` | Generate single image (all rounds) |
-| POST | `/api/images/generate/batch` | Start batch generation |
-| GET | `/api/images/generate/batch/[batchId]` | Get batch status |
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| POST | `/api/images/generate/single` | 3-round pipeline (MAIN → DIFF → stitch 7 languages) |
+| POST | `/api/images/generate/batch` | Queue batch by mode (all/ungenerated/unimaged); supports concurrency + continueOnError |
+| GET | `/api/images/generate/batch/[batchId]` | Batch status |
 | GET | `/api/images/progress/[imageId]` | SSE progress stream |
-| GET | `/api/images/stats` | Image generation statistics |
+| GET | `/api/images/stats` | Aggregate image stats |
+| GET | `/api/images/batches` | Paginated batch history (status filter) |
+| POST | `/api/images/stitch` | Re-stitch final images (Python stitcher) |
 
-### Single Generation
+## Records & Prompts
 
-**Request:** imageId, languageIds (optional, default all 7)
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| GET | `/api/records` | Paginated records; filter `status` (completed/pending) |
+| DELETE | `/api/records/bulk-delete` | Delete records by IDs |
 
-**Process:** 3-round flow (main → diff → stitch)
+## Health, Sync & Monitoring
 
-### Batch Generation
-
-**Modes:**
-- `all` - Generate all matching combinations
-- `ungenerated` - Only prompts pending
-- `unimaged` - Only images pending
-
-**Options:** concurrency (1-5), continueOnError
-
----
-
-## Record Management (2 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/records` | List records (paginated) |
-| DELETE | `/api/records/bulk-delete` | Bulk delete records |
-
-**Query Params:**
-- page, limit - Pagination
-- status - Filter by completed/pending
-
----
-
-## Health & Monitoring (7 endpoints)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | System health check |
-| GET | `/api/sync/check` | Check data sync issues |
-| POST | `/api/sync/repair` | Repair sync issues |
-| GET | `/api/sync/history` | Sync repair history |
-| GET | `/api/providers/stats` | Provider usage statistics |
-| GET | `/api/queue/stats` | Queue statistics |
-| GET | `/api/errors` | Query error logs |
-| DELETE | `/api/errors` | Delete error logs |
-| GET | `/api/errors/stats` | Error statistics |
-
-### Health Check Response
-
-**Status:** HEALTHY (200), DEGRADED (207), UNHEALTHY (503)
-
-**Components checked:**
-- Database connectivity
-- Provider availability (Gemini, ByteDance)
-- Queue status
-- File system
-- Memory usage
-
-### Sync Checkers
-
-8 checkers run in parallel:
-- LibraryConfig, InvalidRefs, PromptSync, ImageSync
-- ComboStatus, FieldIntegrity, Orphan, Duplicate
-
----
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| GET | `/api/health` | Health summary (DB, providers, queue, FS, memory) |
+| GET | `/api/sync/check` | 8 checkers (library config, invalid refs, prompt/image sync, combo status, field integrity, orphan, duplicate) |
+| POST | `/api/sync/repair` | Auto-fix issues flagged with `canAutoRepair` |
+| GET | `/api/sync/history` | Repair history |
+| GET | `/api/providers/stats` | Provider usage/success |
+| GET | `/api/queue/stats` | BullMQ stats |
+| GET/DELETE | `/api/errors` | Query/delete error logs |
+| GET | `/api/errors/stats` | Error aggregation |
 
 ## Validation Schemas
 
-Located in `src/schemas/`
-
-| File | Purpose |
-|------|---------|
-| api.schema.ts | Request/response validation |
-| prompt.schema.ts | Prompt data structures |
-| template.schema.ts | Template validation |
-| record.schema.ts | Record and variant schemas |
-| combination.schema.ts | Combination and strategy schemas |
-
----
+Located in `src/schemas/`: `api.schema.ts`, `prompt.schema.ts`, `template.schema.ts`, `record.schema.ts`, `combination.schema.ts` (used across routes for request validation and template previews).
 
 ## Pagination
 
