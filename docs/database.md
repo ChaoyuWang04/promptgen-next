@@ -183,3 +183,7 @@ Uses Atlas for migrations with Prisma schema as source of truth:
 3. Review SQL in `atlas/migrations/`
 4. Run `just db-apply` to apply
 5. Run `just prisma-generate` to update client
+
+## Inspecting Current DB State
+
+- Quick snapshot: Run `just db-snapshot` to export the latest database contents into `context/db-snapshot/`. Start by reading `_summary.md` for record counts and file map. Per-table exports (e.g., `library.json`, `template.json`, `record.json`, `prompt.json`, `image-variant.json`, `image-batch.json`, `error-log.json`, `combination.json`) provide the current rows. Use these snapshots for read-only inspection; no DB access required.
