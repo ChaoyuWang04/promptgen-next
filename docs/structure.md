@@ -2,7 +2,7 @@
 
 ## Overview
 
-Next.js 16 app with App Router, organized by feature and responsibility.
+Next.js 16 app with App Router, organized by feature and responsibility. Root README now documents setup, features, and quick start for this practice project.
 
 ---
 
