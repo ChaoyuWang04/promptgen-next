@@ -12,6 +12,8 @@
  *     scene: []                                        // Empty = all entries
  *   }
  * }
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,7 +24,6 @@ import {
   extractLibrariesFromTemplate,
   validateTemplateLibraryReferences,
 } from '@/lib/utils/template-parser';
-import type { LibraryName } from '@/lib/config/library-config';
 
 /**
  * Request schema (v2 - multi-select support with separate main/diff templates)
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that strategyConfig keys match template libraries
-    const strategyLibraries = Object.keys(strategyConfig) as LibraryName[];
+    const strategyLibraries = Object.keys(strategyConfig);
     const missingLibraries = templateLibraries.filter(
       (lib) => !strategyLibraries.includes(lib)
     );
@@ -228,7 +229,7 @@ export async function POST(request: NextRequest) {
     // Generate combinations using ComboManager
     const comboManager = new ComboManager();
     const combinations = await comboManager.enumerateDynamicCombinations(
-      strategyConfig as Partial<Record<LibraryName, string[]>>
+      strategyConfig as Record<string, string[]>
     );
 
     // Create Combination records in database

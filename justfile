@@ -138,6 +138,14 @@ prisma-format:
 db-seed:
     npx tsx prisma/seed.ts
 
+# Export database snapshot for Claude to read
+db-snapshot:
+    npx tsx scripts/db-snapshot.ts
+
+# Export specific tables (comma-separated)
+db-snapshot-tables tables:
+    npx tsx scripts/db-snapshot.ts --tables={{tables}}
+
 # Reset database (DANGER: drops all data)
 db-reset:
     @echo "WARNING: This will drop all data!"

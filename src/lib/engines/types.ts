@@ -3,70 +3,61 @@
  *
  * Type definitions for the template engine and module builders.
  * Ensures type safety and provides clear interfaces for template rendering.
+ *
+ * NOTE: These types are now dynamic to support database-driven library configuration.
+ * Library names are no longer hardcoded - they come from the database.
  */
-
-import { type LibraryName } from '../config/library-config';
 
 /**
  * Library selection for prompt generation
+ * Now dynamic: keys are library names from database
+ *
+ * Example:
+ * {
+ *   "character": "char_betty_v1",
+ *   "pose": "pose_standing_v1",
+ *   "scene": "scene_living_v1",
+ *   "theme": "theme_summer_v1",
+ *   "style": "style_retro_v1"
+ * }
  */
-export interface LibrarySelection {
-  character: string;
-  pose: string;
-  scene: string;
-  theme: string;
-  style: string;
-  decorative_props?: string;
-}
+export type LibrarySelection = Record<string, string>;
 
 /**
  * Library data loaded from database
+ * Now dynamic: keys are library names from database
  */
-export interface LoadedLibraryData {
-  character: Record<string, any>;
-  pose: Record<string, any>;
-  scene: Record<string, any>;
-  theme: Record<string, any>;
-  style: Record<string, any>;
-  decorative_props?: Record<string, any>;
-}
+export type LoadedLibraryData = Record<string, Record<string, unknown>>;
 
 /**
  * Template rendering context
  *
  * Contains all variables available in templates.
- * Namespaces:
+ * Dynamic namespaces based on library names from database.
+ *
+ * Example namespaces:
  * - character.*
  * - pose.*
  * - scene.*
  * - theme.*
  * - style.*
  * - decorative_props.*
+ * - (any other custom libraries)
  */
-export interface TemplateContext {
-  character: Record<string, any>;
-  pose: Record<string, any>;
-  scene: Record<string, any>;
-  theme: Record<string, any>;
-  style: Record<string, any>;
-  decorative_props?: Record<string, any>;
-}
+export type TemplateContext = Record<string, Record<string, unknown>>;
 
 /**
  * Diff template context
  *
  * Extended context for diff (comparison) templates.
  * Includes outfit state changes and decoration additions.
+ *
+ * Dynamic library data is in the base context,
+ * special diff-related fields are typed explicitly.
  */
-export interface DiffTemplateContext extends TemplateContext {
-  // Main image data (original)
-  main: {
-    character: Record<string, any>;
-    pose: Record<string, any>;
-    scene: Record<string, any>;
-    theme: Record<string, any>;
-    style: Record<string, any>;
-  };
+export interface DiffTemplateContext extends Record<string, unknown> {
+  // Main image data (original) - dynamic library data
+  main: Record<string, Record<string, unknown>>;
 
   // Outfit state changes
   outfit_state: Array<{
@@ -135,7 +126,7 @@ export interface VariableMetadata {
  * Transforms a value in a template expression.
  * Examples: join, uppercase, lowercase, etc.
  */
-export type FilterFunction = (value: any, args?: string[]) => string;
+export type FilterFunction = (value: unknown, args?: string[]) => string;
 
 /**
  * Template validation result
@@ -192,7 +183,7 @@ export interface PromptGenerationResult {
   prompt_en?: string;
 
   /**
-   * Library selections used
+   * Library selections used (dynamic)
    */
   library_ids: LibrarySelection;
 
@@ -263,4 +254,63 @@ export interface DiffPromptGenerationResult {
    * Timestamp
    */
   generated_at: Date;
+}
+
+// ==========================================
+// Validation Helpers
+// ==========================================
+
+/**
+ * Validate that a LibrarySelection has all required libraries
+ */
+export function validateLibrarySelection(
+  selection: LibrarySelection,
+  requiredLibraries: string[]
+): { valid: boolean; missing: string[] } {
+  const missing: string[] = [];
+
+  for (const libName of requiredLibraries) {
+    if (!selection[libName]) {
+      missing.push(libName);
+    }
+  }
+
+  return {
+    valid: missing.length === 0,
+    missing,
+  };
+}
+
+/**
+ * Check if a context has a specific library loaded
+ */
+export function hasLibrary(
+  context: TemplateContext,
+  libraryName: string
+): boolean {
+  return libraryName in context && context[libraryName] !== undefined;
+}
+
+/**
+ * Get a value from context by path (e.g., "character.name")
+ */
+export function getContextValue(
+  context: TemplateContext,
+  path: string
+): unknown {
+  const parts = path.split('.');
+  let value: unknown = context;
+
+  for (const part of parts) {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    if (typeof value === 'object') {
+      value = (value as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+
+  return value;
 }

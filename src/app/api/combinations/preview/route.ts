@@ -3,6 +3,8 @@
  * POST /api/combinations/preview
  *
  * Calculate and preview combination count without actually generating records
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,10 +15,7 @@ import {
   extractLibrariesFromTemplate,
   validateTemplateLibraryReferences,
 } from '@/lib/utils/template-parser';
-import {
-  getLibraryConfig,
-  type LibraryName,
-} from '@/lib/config/library-config';
+import { libraryService } from '@/lib/services';
 
 /**
  * Request schema
@@ -129,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that strategyConfig keys match template libraries
-    const strategyLibraries = Object.keys(strategyConfig) as LibraryName[];
+    const strategyLibraries = Object.keys(strategyConfig);
     const missingLibraries = templateLibraries.filter(
       (lib) => !strategyLibraries.includes(lib)
     );
@@ -155,13 +154,14 @@ export async function POST(request: NextRequest) {
     // Calculate combination count
     const comboManager = new ComboManager();
     const totalCombinations = await comboManager.calculateDynamicCombinationCount(
-      strategyConfig as Partial<Record<LibraryName, string[]>>
+      strategyConfig as Record<string, string[]>
     );
 
     // Build library selection summary
     const librarySummary = await Promise.all(
       templateLibraries.map(async (libName) => {
-        const config = getLibraryConfig(libName);
+        // Get library config from LibraryService
+        const config = await libraryService.getByName(libName);
         const selectedIds = strategyConfig[libName] || [];
 
         // Get library from database
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        const entries = library.entries as Record<string, any>;
+        const entries = library.entries as Record<string, Record<string, unknown>>;
         const totalCount = Object.keys(entries).length;
 
         // Get selected element names
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
                   const displayField = config?.displayField || 'name';
                   return {
                     id,
-                    name: entry[displayField] || entry.name || id,
+                    name: (entry[displayField] as string) || (entry.name as string) || id,
                   };
                 })
                 .filter((el) => el !== null)

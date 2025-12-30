@@ -6,11 +6,13 @@
  *
  * Query parameters:
  * - type: Template category (main or diff) - optional, returns all if not specified
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { ENABLED_LIBRARIES } from '@/lib/config/library-config';
+import { libraryService } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,19 +74,25 @@ function generateExampleFromSchema(schemaProp: any, fieldName: string): string {
 
 /**
  * Generate variable metadata from library JSON schemas
+ *
+ * Uses LibraryService for dynamic library configuration.
  */
 async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<VariablesResponse> {
   const variables: VariableMetadata[] = [];
   const warnings: Warning[] = [];
 
-  // Load all libraries and extract variables from their JSON schemas
-  for (const libConfig of ENABLED_LIBRARIES) {
+  // Load all libraries dynamically from database
+  const libraries = await libraryService.getAll();
+
+  for (const libConfig of libraries) {
+    // Load library schema from database
     const library = await prisma.library.findUnique({
       where: { name: libConfig.name },
       select: { schema: true, name: true, category: true },
     });
 
     if (!library) {
+      // This shouldn't happen since we're iterating from libraryService
       warnings.push({
         library: libConfig.name,
         message: `库 "${libConfig.displayName}" 不存在于数据库中`,
@@ -110,7 +118,7 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
     }
 
     // Parse schema
-    const schema = library.schema as any;
+    const schema = library.schema as Record<string, unknown>;
 
     if (!schema.properties || typeof schema.properties !== 'object') {
       warnings.push({
@@ -121,8 +129,8 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
     }
 
     // Extract variables from schema properties
-    for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const prop = fieldSchema as any;
+    for (const [fieldName, fieldSchema] of Object.entries(schema.properties as Record<string, unknown>)) {
+      const prop = fieldSchema as Record<string, unknown>;
       const variableName = `${libConfig.name}.${fieldName}`;
       const type = inferTypeFromSchema(prop);
       const isArray = prop.type === 'array';
@@ -130,7 +138,7 @@ async function generateVariableMetadata(category?: 'MAIN' | 'DIFF'): Promise<Var
       variables.push({
         name: variableName,
         type: type,
-        description: prop.description || `${libConfig.displayName} - ${fieldName}`,
+        description: (prop.description as string) || `${libConfig.displayName} - ${fieldName}`,
         example: isArray
           ? `{{${variableName} | join}}`
           : `{{${variableName}}}`,

@@ -49,3 +49,6 @@ atlas/.atlas
 /playwright/.cache
 /public
 /context/old_project/
+/context/db-snapshot/
+dev/
+.playwright-mcp/

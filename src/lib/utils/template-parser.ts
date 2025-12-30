@@ -5,9 +5,11 @@
  * Supports: {{library.field}} syntax
  *
  * Used for automatic library detection in strategy generation.
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
-import { LIBRARY_NAMES, type LibraryName, isValidLibraryName } from '../config/library-config';
+import { isValidLibraryName } from '../config/library-config';
 
 /**
  * Extract library names referenced in template content
@@ -15,11 +17,14 @@ import { LIBRARY_NAMES, type LibraryName, isValidLibraryName } from '../config/l
  * @param content - Template content string
  * @returns Array of unique library names found in template
  *
+ * Note: This function validates library names against the cached config.
+ * Make sure initLibraryConfigCache() is called at app startup.
+ *
  * @example
  * const content = "{{character.name}} in {{scene.location}} with {{pose.emotion}}";
  * extractLibrariesFromTemplate(content); // ['character', 'scene', 'pose']
  */
-export function extractLibrariesFromTemplate(content: string): LibraryName[] {
+export function extractLibrariesFromTemplate(content: string): string[] {
   if (!content || content.trim() === '') {
     return [];
   }
@@ -27,13 +32,13 @@ export function extractLibrariesFromTemplate(content: string): LibraryName[] {
   // Regular expression to match {{library.field}} syntax
   const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\|[^}]*)?\}\}/g;
 
-  const libraries = new Set<LibraryName>();
+  const libraries = new Set<string>();
   let match: RegExpExecArray | null;
 
   while ((match = variablePattern.exec(content)) !== null) {
     const libraryName = match[1]; // Capture group 1: library name
 
-    // Validate against known library names
+    // Validate against known library names (uses cached config)
     if (isValidLibraryName(libraryName)) {
       libraries.add(libraryName);
     }

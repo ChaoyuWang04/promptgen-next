@@ -1,11 +1,13 @@
 /**
  * Combo Manager
  * Enumerates all possible library combinations for batch generation
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { prisma } from '@/lib/db/prisma';
 import { generateImageId } from '@/lib/utils/image-id';
-import type { LibraryName } from '@/lib/config/library-config';
+import { libraryService } from '@/lib/services';
 
 /**
  * Library filter for combination enumeration
@@ -315,10 +317,10 @@ export class ComboManager {
    * })
    */
   async calculateDynamicCombinationCount(
-    strategyConfig: Partial<Record<LibraryName, string[]>>
+    strategyConfig: Record<string, string[]>
   ): Promise<number> {
     const libraries = await this.loadDynamicLibraries(
-      Object.keys(strategyConfig) as LibraryName[]
+      Object.keys(strategyConfig)
     );
 
     let total = 1;
@@ -358,11 +360,11 @@ export class ComboManager {
    * // Returns: ['betty_christmas_bedroom', 'betty_halloween_bedroom']
    */
   async enumerateDynamicCombinations(
-    strategyConfig: Partial<Record<LibraryName, string[]>>
+    strategyConfig: Record<string, string[]>
   ): Promise<Array<{ imageId: string; libraryIds: Record<string, string> }>> {
     console.log('[ComboManager] Enumerating dynamic combinations:', strategyConfig);
 
-    const libraryNames = Object.keys(strategyConfig) as LibraryName[];
+    const libraryNames = Object.keys(strategyConfig);
     const libraries = await this.loadDynamicLibraries(libraryNames);
 
     // Prepare selected entries for each library (include both id and name)
@@ -379,7 +381,7 @@ export class ComboManager {
       // Map entries to include both id and name
       selectedEntriesMap[libraryName] = filteredEntries.map((entry) => ({
         id: entry.id,
-        name: entry.name || entry.id, // Fallback to id if name is missing
+        name: String(entry.name || entry.id), // Fallback to id if name is missing
       }));
     }
 
@@ -399,7 +401,7 @@ export class ComboManager {
   /**
    * Load library entries for specific library names
    */
-  private async loadDynamicLibraries(libraryNames: LibraryName[]) {
+  private async loadDynamicLibraries(libraryNames: string[]) {
     const libraries = await prisma.library.findMany({
       where: {
         name: {
@@ -408,10 +410,10 @@ export class ComboManager {
       },
     });
 
-    const libraryMap: Record<string, Array<{ id: string; [key: string]: any }>> = {};
+    const libraryMap: Record<string, Array<{ id: string; [key: string]: unknown }>> = {};
 
     for (const library of libraries) {
-      const entries = library.entries as Record<string, any>;
+      const entries = library.entries as Record<string, Record<string, unknown>>;
       libraryMap[library.name] = Object.entries(entries).map(([id, data]) => ({
         id,
         ...data,
@@ -425,7 +427,7 @@ export class ComboManager {
    * Generate Cartesian product for dynamic library combinations
    */
   private generateCartesianProduct(
-    libraryNames: LibraryName[],
+    libraryNames: string[],
     entriesMap: Record<string, Array<{ id: string; name: string }>>
   ): Array<{ imageId: string; libraryIds: Record<string, string> }> {
     const results: Array<{ imageId: string; libraryIds: Record<string, string> }> =

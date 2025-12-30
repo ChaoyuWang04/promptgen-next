@@ -3,12 +3,15 @@
  *
  * Generates diff (comparison) image prompts based on existing main images.
  * Implements 3 color changes + 8-9 decoration additions.
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { prisma } from '../db/prisma';
 import { renderTemplate } from '../engines/template-engine';
-import { type DiffTemplateContext, type DiffPromptGenerationResult } from '../engines/types';
+import { type DiffTemplateContext, type DiffPromptGenerationResult, type LibrarySelection, type TemplateContext } from '../engines/types';
 import { generateOutfitChanges, selectRandomDecorations } from '../utils/random';
+import { libraryService } from '../services';
 
 /**
  * Default color pool for outfit color changes
@@ -106,20 +109,10 @@ async function loadRecord(imageId: string): Promise<any> {
 }
 
 /**
- * Load library entry
+ * Load library entry by ID using LibraryService
  */
-async function loadLibraryEntry(libraryName: string, entryId: string): Promise<any> {
-  const library = await prisma.library.findUnique({
-    where: { name: libraryName },
-    select: { entries: true },
-  });
-
-  if (!library) {
-    throw new Error(`Library not found: ${libraryName}`);
-  }
-
-  const entries = library.entries as Record<string, any>;
-  const entry = entries[entryId];
+async function loadLibraryEntry(libraryName: string, entryId: string): Promise<Record<string, unknown>> {
+  const entry = await libraryService.getEntry(libraryName, entryId);
 
   if (!entry) {
     throw new Error(`Entry not found in ${libraryName}: ${entryId}`);
@@ -129,10 +122,15 @@ async function loadLibraryEntry(libraryName: string, entryId: string): Promise<a
 }
 
 /**
- * Build diff template context
+ * Build diff template context dynamically
+ *
+ * Loads all libraries from database and builds context based on selections.
  */
 async function buildDiffContext(
-  record: any,
+  record: {
+    libraryIds: LibrarySelection;
+    usedDecorations: { from_theme: string[]; from_scene: string[] };
+  },
   outfitChanges: Array<{
     element: string;
     original_color: string;
@@ -145,16 +143,28 @@ async function buildDiffContext(
     all: Array<{ name: string; source: string }>;
   }
 ): Promise<DiffTemplateContext> {
-  // Load library data
-  const libraryIds = record.libraryIds as any;
+  // Load library data dynamically
+  const libraryIds = record.libraryIds;
+  const libraries = await libraryService.getAll();
 
-  const [character, pose, scene, theme, style] = await Promise.all([
-    loadLibraryEntry('character', libraryIds.character),
-    loadLibraryEntry('pose', libraryIds.pose),
-    loadLibraryEntry('scene', libraryIds.scene),
-    loadLibraryEntry('theme', libraryIds.theme),
-    loadLibraryEntry('style', libraryIds.style),
-  ]);
+  // Build main context with all library data
+  const mainContext: Record<string, Record<string, unknown>> = {};
+
+  // Load entries for all selected libraries in parallel
+  const loadPromises: Promise<void>[] = [];
+
+  for (const library of libraries) {
+    const entryId = libraryIds[library.name];
+    if (entryId) {
+      loadPromises.push(
+        loadLibraryEntry(library.name, entryId).then(entry => {
+          mainContext[library.name] = entry;
+        })
+      );
+    }
+  }
+
+  await Promise.all(loadPromises);
 
   // Build outfit state descriptions
   const outfitState = outfitChanges.map((change, index) => {
@@ -185,35 +195,115 @@ async function buildDiffContext(
   // Build decoration descriptions
   const allDecorations = newDecorations.all.map(d => d.name);
 
+  // Build context with dynamic library data
   const context: DiffTemplateContext = {
-    // Main image data
-    main: {
-      character,
-      pose,
-      scene,
-      theme,
-      style,
-    },
-
-    // Current libraries (same as main)
-    character,
-    pose,
-    scene,
-    theme,
-    style,
+    // Main image data (all libraries)
+    main: mainContext,
 
     // Outfit state changes
-    outfit_state: outfitState.map(s => s.description) as any,
-    new_outfit_state: newOutfitState as any,
+    outfit_state: outfitState.map(s => ({
+      element: s.element,
+      current_color: s.current_color,
+    })),
+    new_outfit_state: newOutfitState,
     color_changes: colorChanges,
 
     // Decoration changes
     decorations: record.usedDecorations,
-    new_decorations: allDecorations as any, // Use string array for template
+    new_decorations: newDecorations.all,
     all_decorations: allDecorations,
   };
 
+  // Also add each library at top level for easy access in templates
+  // e.g., {{character.name}} instead of {{main.character.name}}
+  for (const [libName, libData] of Object.entries(mainContext)) {
+    (context as Record<string, unknown>)[libName] = libData;
+  }
+
   return context;
+}
+
+/**
+ * Extract outfit data from library entries using dynamic field mapping
+ *
+ * Uses metadata.generatorConfig.outfitField to find the correct field
+ */
+async function extractOutfitData(
+  libraryIds: LibrarySelection
+): Promise<Array<{
+  element: string;
+  original_color: string;
+  color_pool: string[];
+  description_template?: string;
+}>> {
+  const libraries = await libraryService.getAll();
+
+  for (const library of libraries) {
+    const outfitField = library.metadata?.generatorConfig?.outfitField;
+    if (!outfitField) continue;
+
+    const entryId = libraryIds[library.name];
+    if (!entryId) continue;
+
+    const entry = await libraryService.getEntry(library.name, entryId);
+    if (!entry) continue;
+
+    const rawOutfitData = entry[outfitField];
+    if (rawOutfitData) {
+      return normalizeOutfitMinor(rawOutfitData);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Extract decoration data from library entries using dynamic field mapping
+ *
+ * Uses metadata.generatorConfig.decorationField to find decoration sources
+ */
+async function extractDecorationData(
+  libraryIds: LibrarySelection
+): Promise<{
+  decorations: Array<{ name: string; priority?: string }>;
+  sources: Array<{ libraryName: string; fieldName: string }>;
+}> {
+  const libraries = await libraryService.getAll();
+  const allDecorations: Array<{ name: string; priority?: string }> = [];
+  const sources: Array<{ libraryName: string; fieldName: string }> = [];
+
+  for (const library of libraries) {
+    const decorationField = library.metadata?.generatorConfig?.decorationField;
+    const additionalField = library.metadata?.generatorConfig?.additionalDecorationField;
+
+    const entryId = libraryIds[library.name];
+    if (!entryId) continue;
+
+    const entry = await libraryService.getEntry(library.name, entryId);
+    if (!entry) continue;
+
+    // Process primary decoration field
+    if (decorationField) {
+      const rawDecorations = entry[decorationField];
+      if (rawDecorations) {
+        const normalized = normalizeDecorations(rawDecorations);
+        allDecorations.push(...normalized);
+        sources.push({ libraryName: library.name, fieldName: decorationField });
+      }
+    }
+
+    // Process additional decoration field
+    if (additionalField) {
+      const rawDecorations = entry[additionalField];
+      if (rawDecorations) {
+        const normalized = normalizeDecorations(rawDecorations);
+        allDecorations.push(...normalized);
+        sources.push({ libraryName: library.name, fieldName: additionalField });
+      }
+    }
+  }
+
+  return { decorations: allDecorations, sources };
 }
 
 /**
@@ -246,34 +336,29 @@ export async function generateDiffPrompt(
     throw new Error(`Template ${templateName} is not a DIFF template`);
   }
 
-  // Load library data for outfit changes and decorations
-  const libraryIds = record.libraryIds as any;
-  const character = await loadLibraryEntry('character', libraryIds.character);
-  const theme = await loadLibraryEntry('theme', libraryIds.theme);
-
-  // Normalize outfit_minor data format
-  // Old format: [{element, original_color, color_pool}]
-  // Simple format: ["红色平底鞋", ...] (string array)
-  const rawOutfitMinor = character.outfit_minor || [];
-  const normalizedOutfitMinor = normalizeOutfitMinor(rawOutfitMinor);
+  // Extract outfit data using dynamic field mapping
+  const libraryIds = record.libraryIds as LibrarySelection;
+  const normalizedOutfitMinor = await extractOutfitData(libraryIds);
 
   // Generate 3 outfit color changes
   const outfitChanges = generateOutfitChanges(normalizedOutfitMinor, 3);
 
-  // Normalize decorative_props data format
-  // Old format: [{name, priority}]
-  // Simple format: ["遮阳伞", ...] (string array)
-  const rawDecorations = theme.decorative_props || [];
-  const normalizedDecorations = normalizeDecorations(rawDecorations);
+  // Extract decoration data using dynamic field mapping
+  const { decorations: normalizedDecorations } = await extractDecorationData(libraryIds);
 
   // Generate 8-9 decoration additions
   const newDecorations = selectRandomDecorations(normalizedDecorations, [], 8);
 
-  // Build context
-  const context = await buildDiffContext(record, outfitChanges, newDecorations);
+  // Build context with properly typed record
+  const typedRecord = {
+    libraryIds,
+    usedDecorations: record.usedDecorations as { from_theme: string[]; from_scene: string[] },
+  };
+  const context = await buildDiffContext(typedRecord, outfitChanges, newDecorations);
 
   // Render template
-  const promptCn = renderTemplate(template.content, context as any, {
+  // DiffTemplateContext has mixed types (arrays, objects) so we cast via unknown
+  const promptCn = renderTemplate(template.content, context as unknown as TemplateContext, {
     strict: false,
   });
 

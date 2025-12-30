@@ -3,10 +3,9 @@
 /**
  * Create Library Dialog Component
  *
- * 创建新库对话框（三步骤）：
- * Step 1: 选择模板或空白库
- * Step 2: 填写基本信息
- * Step 3: 定义 Schema（仅空白库）
+ * 创建新库对话框（两步骤）：
+ * Step 1: 填写基本信息
+ * Step 2: 定义 Schema
  */
 
 import { useState } from 'react';
@@ -35,10 +34,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { useLibraryTemplates, useCreateLibrary, type LibraryTemplate } from '@/hooks/use-libraries';
-import { Loader2, FileText, Sparkles, ChevronLeft } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { useCreateLibrary } from '@/hooks/use-libraries';
+import { Loader2, ChevronLeft } from 'lucide-react';
 import { SchemaEditor } from './schema-editor';
 
 // Form validation schema
@@ -69,11 +66,9 @@ export function CreateLibraryDialog({
   onOpenChange,
   onSuccess,
 }: CreateLibraryDialogProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedTemplate, setSelectedTemplate] = useState<LibraryTemplate | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
   const [customSchema, setCustomSchema] = useState<Record<string, unknown> | null>(null);
 
-  const { data: templates, isLoading: isLoadingTemplates } = useLibraryTemplates();
   const createLibrary = useCreateLibrary();
 
   const form = useForm<CreateLibraryFormData>({
@@ -86,27 +81,12 @@ export function CreateLibraryDialog({
     },
   });
 
-  const handleTemplateSelect = (template: LibraryTemplate | null) => {
-    setSelectedTemplate(template);
-
-    // Pre-fill form if template is selected
-    if (template) {
-      form.setValue('displayField', template.displayField);
-      form.setValue('description', template.description);
-    }
-
+  const handleNext = () => {
     setStep(2);
   };
 
   const handleBack = () => {
     setStep(1);
-  };
-
-  const handleNext = () => {
-    // For blank library, go to schema definition step
-    if (!selectedTemplate) {
-      setStep(3);
-    }
   };
 
   const handleSubmit = async (data: CreateLibraryFormData) => {
@@ -117,14 +97,12 @@ export function CreateLibraryDialog({
         description: data.description,
         displayField: data.displayField || 'name',
         category: data.category,
-        templateName: selectedTemplate?.name,
-        schema: !selectedTemplate ? customSchema || undefined : undefined,
+        schema: customSchema || undefined,
       });
 
       // Reset and close
       form.reset();
       setStep(1);
-      setSelectedTemplate(null);
       setCustomSchema(null);
       onOpenChange(false);
       onSuccess?.();
@@ -137,7 +115,6 @@ export function CreateLibraryDialog({
   const handleClose = () => {
     form.reset();
     setStep(1);
-    setSelectedTemplate(null);
     setCustomSchema(null);
     onOpenChange(false);
   };
@@ -147,93 +124,18 @@ export function CreateLibraryDialog({
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {step === 1 && '创建新库 - 选择模板'}
-            {step === 2 && '创建新库 - 填写信息'}
-            {step === 3 && '创建新库 - 定义 Schema'}
+            {step === 1 && '创建新库 - 填写信息'}
+            {step === 2 && '创建新库 - 定义 Schema'}
           </DialogTitle>
           <DialogDescription>
-            {step === 1 && '选择一个预定义模板快速开始，或创建空白库自定义结构'}
-            {step === 2 && '填写库的基本信息'}
-            {step === 3 && '定义库的字段结构（JSON Schema 格式）'}
+            {step === 1 && '填写库的基本信息'}
+            {step === 2 && '定义库的字段结构（JSON Schema 格式）'}
           </DialogDescription>
         </DialogHeader>
 
         {step === 1 && (
-          <div className="space-y-4">
-            {isLoadingTemplates ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {/* Blank Library Option */}
-                <Card
-                  className={cn(
-                    'cursor-pointer transition-all hover:border-primary',
-                    'hover:shadow-md'
-                  )}
-                  onClick={() => handleTemplateSelect(null)}
-                >
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle className="text-base">空白库</CardTitle>
-                    </div>
-                    <CardDescription className="text-sm">
-                      创建一个空白库，自定义字段结构
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-
-                {/* Template Options */}
-                {templates?.map((template) => (
-                  <Card
-                    key={template.name}
-                    className={cn(
-                      'cursor-pointer transition-all hover:border-primary',
-                      'hover:shadow-md'
-                    )}
-                    onClick={() => handleTemplateSelect(template)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-primary" />
-                        <CardTitle className="text-base">{template.displayName}</CardTitle>
-                      </div>
-                      <CardDescription className="text-sm line-clamp-2">
-                        {template.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-xs text-muted-foreground">
-                      类型: {template.structureType === 'standard' ? '标准' : '嵌套数组'}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 2 && (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              {/* Selected Template Info */}
-              {selectedTemplate && (
-                <Card className="bg-muted/50">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <CardTitle className="text-sm">
-                        使用模板: {selectedTemplate.displayName}
-                      </CardTitle>
-                    </div>
-                    <CardDescription className="text-xs">
-                      {selectedTemplate.description}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              )}
-
+            <form className="space-y-4">
               {/* Library Name */}
               <FormField
                 control={form.control}
@@ -242,7 +144,7 @@ export function CreateLibraryDialog({
                   <FormItem>
                     <FormLabel>库名称 *</FormLabel>
                     <FormControl>
-                      <Input placeholder="character" {...field} />
+                      <Input placeholder="my_library" {...field} />
                     </FormControl>
                     <FormDescription>
                       小写字母开头，只能包含字母、数字和下划线（例如: my_library）
@@ -260,7 +162,7 @@ export function CreateLibraryDialog({
                   <FormItem>
                     <FormLabel>显示名称 *</FormLabel>
                     <FormControl>
-                      <Input placeholder="人物" {...field} />
+                      <Input placeholder="我的库" {...field} />
                     </FormControl>
                     <FormDescription>
                       在界面中显示的中文名称
@@ -344,28 +246,18 @@ export function CreateLibraryDialog({
               />
 
               <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={handleBack}>
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  返回
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  取消
                 </Button>
-                {selectedTemplate ? (
-                  <Button type="submit" disabled={createLibrary.isPending}>
-                    {createLibrary.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    创建
-                  </Button>
-                ) : (
-                  <Button type="button" onClick={handleNext}>
-                    下一步
-                  </Button>
-                )}
+                <Button type="button" onClick={handleNext}>
+                  下一步
+                </Button>
               </DialogFooter>
             </form>
           </Form>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <div className="space-y-4">
             <SchemaEditor
               value={customSchema || undefined}
@@ -374,7 +266,7 @@ export function CreateLibraryDialog({
             />
 
             <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={() => setStep(2)}>
+              <Button type="button" variant="outline" onClick={handleBack}>
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 返回
               </Button>
@@ -390,14 +282,6 @@ export function CreateLibraryDialog({
               </Button>
             </DialogFooter>
           </div>
-        )}
-
-        {step === 1 && (
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose}>
-              取消
-            </Button>
-          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

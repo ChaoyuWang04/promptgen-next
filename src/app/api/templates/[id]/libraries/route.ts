@@ -3,6 +3,8 @@
  * GET /api/templates/[id]/libraries
  *
  * Parse template content and return referenced libraries
+ *
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,10 +13,7 @@ import {
   extractLibrariesFromTemplate,
   validateTemplateLibraryReferences,
 } from '@/lib/utils/template-parser';
-import {
-  getLibraryConfig,
-  type LibraryName,
-} from '@/lib/config/library-config';
+import { libraryService } from '@/lib/services';
 
 /**
  * GET /api/templates/[id]/libraries
@@ -83,7 +82,8 @@ export async function GET(
     // Fetch library metadata for each referenced library
     const librariesWithMetadata = await Promise.all(
       libraryNames.map(async (libName) => {
-        const config = getLibraryConfig(libName);
+        // Get library config from LibraryService
+        const config = await libraryService.getByName(libName);
 
         // Get entry count from database
         const library = await prisma.library.findUnique({
@@ -107,7 +107,7 @@ export async function GET(
           };
         }
 
-        const entries = library.entries as Record<string, any>;
+        const entries = library.entries as Record<string, unknown>;
         const entryCount = Object.keys(entries).length;
 
         return {
@@ -117,9 +117,9 @@ export async function GET(
           entryCount,
           isActive: library.isActive,
           config: {
-            type: config?.type,
+            type: config?.isRequired ? 'required' : 'optional',
             displayField: config?.displayField,
-            structureType: config?.structureType,
+            structureType: config?.metadata?.structureType || 'standard',
           },
         };
       })

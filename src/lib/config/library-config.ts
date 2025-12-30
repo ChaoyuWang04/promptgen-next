@@ -1,25 +1,26 @@
 /**
  * Library Configuration
  *
- * Centralizes metadata for all library types.
- * Defines display names, fields, ordering, and validation rules.
+ * This module provides backward-compatible wrappers around LibraryService.
+ * New code should use libraryService directly from '@/lib/services'.
  *
- * This is the SINGLE SOURCE OF TRUTH for library configuration.
+ * MIGRATION NOTICE:
+ * - All synchronous functions are deprecated and will be removed in a future version
+ * - Use async functions or libraryService directly for new code
+ * - Library configuration is now stored in the database, not hardcoded
  */
+
+import { libraryService, type LibraryConfig as ServiceLibraryConfig } from '../services';
+
+// ==========================================
+// Types (kept for backward compatibility)
+// ==========================================
 
 /**
- * Library type enum
+ * Library name type - now dynamic from database
+ * @deprecated Use string type directly, library names are dynamic
  */
-export const LIBRARY_NAMES = [
-  'character',
-  'pose',
-  'scene',
-  'theme',
-  'style',
-  'decorative_props',
-] as const;
-
-export type LibraryName = (typeof LIBRARY_NAMES)[number];
+export type LibraryName = string;
 
 /**
  * Library structure type
@@ -38,10 +39,11 @@ export type LibraryCategory = 'MAIN' | 'DIFF';
 
 /**
  * Library configuration interface
+ * Compatible with the old interface structure
  */
 export interface LibraryConfig {
   /** Internal name (matches database) */
-  name: LibraryName;
+  name: string;
 
   /** Display name (Chinese) */
   displayName: string;
@@ -52,7 +54,7 @@ export interface LibraryConfig {
   /** Whether this library is required for prompt generation */
   type: LibraryRequirementType;
 
-  /** Library category: MAIN (用于主图模板) or DIFF (用于差异图模板) */
+  /** Library category: MAIN or DIFF */
   category: LibraryCategory;
 
   /** Sort order in UI */
@@ -63,183 +65,281 @@ export interface LibraryConfig {
 
   /** Description of the library's purpose */
   description?: string;
+
+  /** Abbreviation for image ID generation */
+  abbreviation?: string;
 }
 
 /**
- * ENABLED LIBRARIES CONFIGURATION
- *
- * This array defines all active libraries in the system.
- * To add a new library:
- * 1. Add entry here
- * 2. Create data/{name}.json file
- * 3. Add Prisma query helpers in src/lib/db/queries.ts
- * 4. Frontend will auto-adapt (no changes needed)
+ * Convert ServiceLibraryConfig to legacy LibraryConfig
  */
-export const ENABLED_LIBRARIES: LibraryConfig[] = [
-  {
-    name: 'character',
-    displayName: '人物',
-    displayField: 'name',
-    type: 'required',
-    category: 'MAIN',
-    order: 1,
-    structureType: 'standard',
-    description: '角色人物定义，包含外貌、服装、配色规则',
-  },
-  {
-    name: 'pose',
-    displayName: '姿态',
-    displayField: 'name',
-    type: 'required',
-    category: 'MAIN',
-    order: 2,
-    structureType: 'standard',
-    description: '人物姿态动作，包含身体朝向、肢体位置、情绪',
-  },
-  {
-    name: 'scene',
-    displayName: '场景',
-    displayField: 'name',
-    type: 'required',
-    category: 'MAIN',
-    order: 3,
-    structureType: 'standard',
-    description: '背景场景环境，包含地点、家具、氛围',
-  },
-  {
-    name: 'theme',
-    displayName: '主题',
-    displayField: 'name',
-    type: 'required',
-    category: 'MAIN',
-    order: 4,
-    structureType: 'standard',
-    description: '节日或活动主题，包含特定装饰道具',
-  },
-  {
-    name: 'style',
-    displayName: '画风',
-    displayField: 'era_style',
-    type: 'required',
-    category: 'MAIN',
-    order: 5,
-    structureType: 'standard',
-    description: '艺术风格定义，包含色调、光照、渲染方式',
-  },
-  {
-    name: 'decorative_props',
-    displayName: '装饰小物',
-    displayField: 'name',
-    type: 'optional',
-    category: 'DIFF',
-    order: 6,
-    structureType: 'nested_array',
-    description: '通用装饰小道具库，用于对比图生成',
-  },
-];
+function toLegacyConfig(lib: ServiceLibraryConfig): LibraryConfig {
+  return {
+    name: lib.name,
+    displayName: lib.displayName,
+    displayField: lib.displayField,
+    type: lib.isRequired ? 'required' : 'optional',
+    category: lib.category,
+    order: lib.order,
+    structureType: (lib.metadata?.structureType as LibraryStructureType) || 'standard',
+    description: lib.description || undefined,
+    abbreviation: lib.abbreviation || undefined,
+  };
+}
+
+// ==========================================
+// Async Functions (recommended for new code)
+// ==========================================
 
 /**
- * Helper Functions
+ * Get library configuration by name (async)
  */
+export async function getLibraryConfigAsync(name: string): Promise<LibraryConfig | undefined> {
+  const lib = await libraryService.getByName(name);
+  return lib ? toLegacyConfig(lib) : undefined;
+}
 
 /**
- * Get library configuration by name
+ * Get all required libraries (async)
+ */
+export async function getRequiredLibrariesAsync(): Promise<LibraryConfig[]> {
+  const libs = await libraryService.getRequired();
+  return libs.map(toLegacyConfig);
+}
+
+/**
+ * Get all optional libraries (async)
+ */
+export async function getOptionalLibrariesAsync(): Promise<LibraryConfig[]> {
+  const libs = await libraryService.getOptional();
+  return libs.map(toLegacyConfig);
+}
+
+/**
+ * Check if a library name is valid (async)
+ */
+export async function isValidLibraryNameAsync(name: string): Promise<boolean> {
+  return libraryService.isValidLibraryName(name);
+}
+
+/**
+ * Get library display name (async)
+ */
+export async function getLibraryDisplayNameAsync(name: string): Promise<string> {
+  const lib = await libraryService.getByName(name);
+  return lib?.displayName || name;
+}
+
+/**
+ * Get sorted libraries by order field (async)
+ */
+export async function getSortedLibrariesAsync(): Promise<LibraryConfig[]> {
+  const libs = await libraryService.getSortedByOrder();
+  return libs.map(toLegacyConfig);
+}
+
+/**
+ * Get libraries by category (async)
+ */
+export async function getLibrariesByCategoryAsync(category: LibraryCategory): Promise<LibraryConfig[]> {
+  const libs = await libraryService.getByCategory(category);
+  return libs.map(toLegacyConfig);
+}
+
+/**
+ * Get MAIN libraries (async)
+ */
+export async function getMainLibrariesAsync(): Promise<LibraryConfig[]> {
+  return getLibrariesByCategoryAsync('MAIN');
+}
+
+/**
+ * Get DIFF libraries (async)
+ */
+export async function getDiffLibrariesAsync(): Promise<LibraryConfig[]> {
+  return getLibrariesByCategoryAsync('DIFF');
+}
+
+/**
+ * Check if a library belongs to a specific category (async)
+ */
+export async function isLibraryInCategoryAsync(
+  libraryName: string,
+  category: LibraryCategory
+): Promise<boolean> {
+  const config = await libraryService.getByName(libraryName);
+  return config?.category === category;
+}
+
+/**
+ * Get all library names (async)
+ */
+export async function getLibraryNamesAsync(): Promise<string[]> {
+  return libraryService.getNames();
+}
+
+/**
+ * Get all enabled libraries (async)
+ */
+export async function getEnabledLibrariesAsync(): Promise<LibraryConfig[]> {
+  const libs = await libraryService.getAll();
+  return libs.map(toLegacyConfig);
+}
+
+// ==========================================
+// Deprecated Synchronous Functions
+// These are kept for backward compatibility during migration
+// ==========================================
+
+// Cache for synchronous access (populated on first async call)
+let _cachedLibraries: LibraryConfig[] | null = null;
+let _cachePromise: Promise<void> | null = null;
+
+/**
+ * Initialize cache for synchronous access
+ * Call this at app startup to enable synchronous functions
+ */
+export async function initLibraryConfigCache(): Promise<void> {
+  const libs = await libraryService.getAll();
+  _cachedLibraries = libs.map(toLegacyConfig);
+}
+
+/**
+ * Get cached libraries (for synchronous access)
+ * Returns empty array if cache not initialized
+ */
+function getCachedLibraries(): LibraryConfig[] {
+  if (!_cachedLibraries) {
+    // Trigger async initialization if not started
+    if (!_cachePromise) {
+      _cachePromise = initLibraryConfigCache();
+    }
+    console.warn(
+      'Library config cache not initialized. Call initLibraryConfigCache() at app startup.'
+    );
+    return [];
+  }
+  return _cachedLibraries;
+}
+
+/**
+ * Invalidate the library config cache
+ * Call this after library CRUD operations
+ */
+export function invalidateLibraryConfigCache(): void {
+  _cachedLibraries = null;
+  _cachePromise = null;
+  libraryService.invalidateCache();
+}
+
+/**
+ * @deprecated Use getLibraryConfigAsync or libraryService.getByName
  */
 export function getLibraryConfig(name: string): LibraryConfig | undefined {
-  return ENABLED_LIBRARIES.find(lib => lib.name === name);
+  return getCachedLibraries().find(lib => lib.name === name);
 }
 
 /**
- * Get all required libraries
+ * @deprecated Use getRequiredLibrariesAsync or libraryService.getRequired
  */
 export function getRequiredLibraries(): LibraryConfig[] {
-  return ENABLED_LIBRARIES.filter(lib => lib.type === 'required');
+  return getCachedLibraries().filter(lib => lib.type === 'required');
 }
 
 /**
- * Get all optional libraries
+ * @deprecated Use getOptionalLibrariesAsync or libraryService.getOptional
  */
 export function getOptionalLibraries(): LibraryConfig[] {
-  return ENABLED_LIBRARIES.filter(lib => lib.type === 'optional');
+  return getCachedLibraries().filter(lib => lib.type === 'optional');
 }
 
 /**
- * Check if a library name is valid
+ * @deprecated Use isValidLibraryNameAsync or libraryService.isValidLibraryName
  */
-export function isValidLibraryName(name: string): name is LibraryName {
-  return LIBRARY_NAMES.includes(name as LibraryName);
+export function isValidLibraryName(name: string): boolean {
+  return getCachedLibraries().some(lib => lib.name === name);
 }
 
 /**
- * Get library display name
+ * @deprecated Use getLibraryDisplayNameAsync
  */
-export function getLibraryDisplayName(name: LibraryName): string {
+export function getLibraryDisplayName(name: string): string {
   const config = getLibraryConfig(name);
   return config?.displayName || name;
 }
 
 /**
- * Get sorted libraries (by order field)
+ * @deprecated Use getSortedLibrariesAsync or libraryService.getSortedByOrder
  */
 export function getSortedLibraries(): LibraryConfig[] {
-  return [...ENABLED_LIBRARIES].sort((a, b) => a.order - b.order);
+  return [...getCachedLibraries()].sort((a, b) => a.order - b.order);
 }
 
 /**
- * Get libraries by category
- * @param category - MAIN or DIFF
- * @returns Libraries matching the specified category
+ * @deprecated Use getLibrariesByCategoryAsync or libraryService.getByCategory
  */
 export function getLibrariesByCategory(category: LibraryCategory): LibraryConfig[] {
-  return ENABLED_LIBRARIES.filter(lib => lib.category === category);
+  return getCachedLibraries().filter(lib => lib.category === category);
 }
 
 /**
- * Get MAIN libraries (用于主图模板)
+ * @deprecated Use getMainLibrariesAsync
  */
 export function getMainLibraries(): LibraryConfig[] {
   return getLibrariesByCategory('MAIN');
 }
 
 /**
- * Get DIFF libraries (用于差异图模板)
+ * @deprecated Use getDiffLibrariesAsync
  */
 export function getDiffLibraries(): LibraryConfig[] {
   return getLibrariesByCategory('DIFF');
 }
 
 /**
- * Check if a library belongs to a specific category
+ * @deprecated Use isLibraryInCategoryAsync
  */
-export function isLibraryInCategory(libraryName: LibraryName, category: LibraryCategory): boolean {
+export function isLibraryInCategory(libraryName: string, category: LibraryCategory): boolean {
   const config = getLibraryConfig(libraryName);
   return config?.category === category;
 }
 
 /**
- * Library ID field names (for parsing image IDs)
- */
-export const LIBRARY_ID_FIELDS: Record<LibraryName, string> = {
-  character: 'character_id',
-  pose: 'pose_id',
-  scene: 'scene_id',
-  theme: 'theme_id',
-  style: 'style_id',
-  decorative_props: 'decorative_props_id',
-};
-
-/**
  * Get library ID field name
+ * This generates the field name dynamically based on library name
  */
-export function getLibraryIdField(name: LibraryName): string {
-  return LIBRARY_ID_FIELDS[name];
+export function getLibraryIdField(name: string): string {
+  return `${name}_id`;
 }
 
+// ==========================================
+// Deprecated Constants
+// ==========================================
+
 /**
- * Constants
+ * @deprecated Library names are now dynamic from database
+ * Use getLibraryNamesAsync() instead
  */
-export const TOTAL_LIBRARIES = ENABLED_LIBRARIES.length;
-export const REQUIRED_LIBRARIES_COUNT = getRequiredLibraries().length;
-export const OPTIONAL_LIBRARIES_COUNT = getOptionalLibraries().length;
-export const MAIN_LIBRARIES_COUNT = getMainLibraries().length;
-export const DIFF_LIBRARIES_COUNT = getDiffLibraries().length;
+export const LIBRARY_NAMES: readonly string[] = [];
+
+/**
+ * @deprecated Use getEnabledLibrariesAsync() instead
+ */
+export const ENABLED_LIBRARIES: LibraryConfig[] = [];
+
+/**
+ * @deprecated Use libraryService.getStats() instead
+ */
+export const TOTAL_LIBRARIES = 0;
+export const REQUIRED_LIBRARIES_COUNT = 0;
+export const OPTIONAL_LIBRARIES_COUNT = 0;
+export const MAIN_LIBRARIES_COUNT = 0;
+export const DIFF_LIBRARIES_COUNT = 0;
+
+/**
+ * @deprecated Library ID fields are now generated dynamically
+ */
+export const LIBRARY_ID_FIELDS: Record<string, string> = {};
+
+// Re-export libraryService for convenience
+export { libraryService } from '../services';

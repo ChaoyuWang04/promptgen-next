@@ -64,6 +64,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable';
 import { Plus, Eye, Info, Sparkles, Save, SaveAll, Trash2, AlertCircle, Shuffle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -492,12 +497,47 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">模板编辑器</h1>
           <p className="text-muted-foreground">创建和编辑Prompt生成模板</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Template Selector - moved to header */}
+          <div className="flex items-center gap-2">
+            <Select
+              value={selectedTemplate || ''}
+              onValueChange={handleTemplateChange}
+            >
+              <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="选择模板" />
+              </SelectTrigger>
+              <SelectContent>
+                {templates?.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      {template.name}
+                      <Badge variant={template.type === 'SYSTEM' ? 'default' : 'secondary'} className="text-[10px]">
+                        {template.type}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">{template.category}</Badge>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedTemplate && currentTemplate?.type === 'USER' && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <Separator orientation="vertical" className="h-8 hidden sm:block" />
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm">
@@ -573,62 +613,33 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {/* Editor Section - Full Width */}
-      <Card>
-        <CardHeader>
-          <CardTitle>模板编辑器</CardTitle>
-          <CardDescription>
-            使用 <code className="text-xs">{`{{变量名}}`}</code> 语法引用库数据
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Template Selector */}
-            <div className="flex gap-2">
-              <div className="flex-1 space-y-2">
-                <Label>选择模板</Label>
-                <Select
-                  value={selectedTemplate || ''}
-                  onValueChange={handleTemplateChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择一个模板进行编辑" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates?.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        <div className="flex items-center gap-2">
-                          {template.name}
-                          <Badge variant={template.type === 'SYSTEM' ? 'default' : 'secondary'}>
-                            {template.type}
-                          </Badge>
-                          <Badge variant="outline">{template.category}</Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      {/* Resizable Split Panel Layout */}
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="min-h-[700px] rounded-lg border"
+      >
+        {/* Left Panel - Editor */}
+        <ResizablePanel defaultSize={50} minSize={30}>
+          <div className="flex h-full flex-col">
+            {/* Editor Header */}
+            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+              <div>
+                <h3 className="font-medium">编辑器</h3>
+                <p className="text-xs text-muted-foreground">
+                  使用 <code>{`{{变量名}}`}</code> 语法
+                </p>
               </div>
-              {selectedTemplate && currentTemplate?.type === 'USER' && (
-                <div className="flex items-end">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowDeleteDialog(true)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              {hasUnsavedChanges && (
+                <Badge variant="outline" className="text-orange-500 border-orange-500">
+                  未保存
+                </Badge>
               )}
             </div>
 
-            <Separator />
-
-            {/* Monaco Editor */}
-            <div className="rounded-md border">
+            {/* Monaco Editor - fills available space */}
+            <div className="flex-1 min-h-0">
               <Editor
-                height="600px"
+                height="100%"
                 defaultLanguage="plaintext"
                 value={editorContent}
                 onChange={(value) => setEditorContent(value || '')}
@@ -645,7 +656,8 @@ export default function TemplatesPage() {
               />
             </div>
 
-            <div className="flex gap-2">
+            {/* Editor Footer - Save Actions */}
+            <div className="flex gap-2 border-t p-4">
               <Button
                 variant="default"
                 className="flex-1"
@@ -679,89 +691,102 @@ export default function TemplatesPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </ResizablePanel>
 
-      {/* Preview Section - Below Editor */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            实时预览
-          </CardTitle>
-          <CardDescription>选择库元素查看渲染结果</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Library Selectors for Preview - dynamically show only referenced libraries */}
-          {referencedLibraries.length === 0 ? (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                模板未引用任何库变量。请在模板中使用 <code className="text-xs">{`{{library.field}}`}</code> 语法引用库，然后保存模板。
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {config?.enabled_libraries
-                .filter((lib) => referencedLibraries.includes(lib.name))
-                .sort((a, b) => a.order - b.order)
-                .map((lib) => (
-                  <LibraryPreviewSelector
-                    key={lib.name}
-                    libraryName={lib.name}
-                    displayName={lib.displayName}
-                    displayField={lib.displayField}
-                    value={previewSelections[lib.name]}
-                    onChange={(value) =>
-                      setPreviewSelections((prev) => ({ ...prev, [lib.name]: value }))
-                    }
-                  />
-                ))}
+        {/* Resize Handle */}
+        <ResizableHandle withHandle />
+
+        {/* Right Panel - Preview */}
+        <ResizablePanel defaultSize={50} minSize={30}>
+          <div className="flex h-full flex-col">
+            {/* Preview Header */}
+            <div className="border-b bg-muted/30 px-4 py-3">
+              <h3 className="flex items-center gap-2 font-medium">
+                <Eye className="h-4 w-4" />
+                实时预览
+              </h3>
+              <p className="text-xs text-muted-foreground">选择库元素查看渲染结果</p>
             </div>
-          )}
 
-          {/* Random Selection and Preview Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleRandomSelection}
-              variant="outline"
-              disabled={!config || referencedLibraries.length === 0}
-              className="flex-1"
-            >
-              <Shuffle className="mr-2 h-4 w-4" />
-              随机选择并预览
-            </Button>
-            <Button
-              onClick={handlePreview}
-              disabled={previewMutation.isPending || !editorContent || referencedLibraries.length === 0}
-              className="flex-1"
-            >
-              {previewMutation.isPending ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  预览中...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  生成预览
-                </>
-              )}
-            </Button>
-          </div>
+            {/* Preview Content */}
+            <div className="flex-1 overflow-auto p-4">
+              <div className="space-y-4">
+                {/* Library Selectors for Preview */}
+                {referencedLibraries.length === 0 ? (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      模板未引用任何库变量。请在模板中使用 <code className="text-xs">{`{{library.field}}`}</code> 语法引用库，然后保存模板。
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {config?.enabled_libraries
+                      .filter((lib) => referencedLibraries.includes(lib.name))
+                      .sort((a, b) => a.order - b.order)
+                      .map((lib) => (
+                        <LibraryPreviewSelector
+                          key={lib.name}
+                          libraryName={lib.name}
+                          displayName={lib.displayName}
+                          displayField={lib.displayField}
+                          value={previewSelections[lib.name]}
+                          onChange={(value) =>
+                            setPreviewSelections((prev) => ({ ...prev, [lib.name]: value }))
+                          }
+                        />
+                      ))}
+                  </div>
+                )}
 
-          {previewResult && (
-            <>
-              <Separator />
-              <div className="rounded-md bg-muted p-4">
-                <ScrollArea className="h-[400px]">
-                  <pre className="whitespace-pre-wrap text-sm">{previewResult}</pre>
-                </ScrollArea>
+                {/* Preview Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleRandomSelection}
+                    variant="outline"
+                    disabled={!config || referencedLibraries.length === 0}
+                    className="flex-1"
+                    size="sm"
+                  >
+                    <Shuffle className="mr-2 h-4 w-4" />
+                    随机选择
+                  </Button>
+                  <Button
+                    onClick={handlePreview}
+                    disabled={previewMutation.isPending || !editorContent || referencedLibraries.length === 0}
+                    className="flex-1"
+                    size="sm"
+                  >
+                    {previewMutation.isPending ? (
+                      <>
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        预览中...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        生成预览
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Preview Output */}
+                {previewResult && (
+                  <>
+                    <Separator />
+                    <div className="rounded-md bg-muted p-4">
+                      <ScrollArea className="h-[350px]">
+                        <pre className="whitespace-pre-wrap text-sm">{previewResult}</pre>
+                      </ScrollArea>
+                    </div>
+                  </>
+                )}
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       {/* Save As Dialog */}
       <Dialog open={showSaveAsDialog} onOpenChange={setShowSaveAsDialog}>

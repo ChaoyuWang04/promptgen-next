@@ -4,24 +4,29 @@
  * Returns available template variables for autocomplete.
  * Provides metadata about all variables accessible in templates.
  *
- * Replaces Flask: GET /api/templates/variables
+ * Uses dynamic library configuration from database via LibraryService.
  */
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { type VariableMetadata } from '@/lib/engines/types';
-import { ENABLED_LIBRARIES } from '@/lib/config/library-config';
+import { libraryService } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Generate variable metadata from library structure
+ *
+ * Uses LibraryService for dynamic library configuration.
  */
 async function generateVariableMetadata(): Promise<VariableMetadata[]> {
   const variables: VariableMetadata[] = [];
 
+  // Load all libraries dynamically from database
+  const libraries = await libraryService.getAll();
+
   // Load one example entry from each library to infer structure
-  for (const libConfig of ENABLED_LIBRARIES) {
+  for (const libConfig of libraries) {
     const library = await prisma.library.findUnique({
       where: { name: libConfig.name },
       select: { entries: true },
@@ -29,16 +34,17 @@ async function generateVariableMetadata(): Promise<VariableMetadata[]> {
 
     if (!library) continue;
 
-    const entries = library.entries as Record<string, any>;
-    let sampleEntry: any;
+    const entries = library.entries as Record<string, unknown>;
+    let sampleEntry: Record<string, unknown> | undefined;
 
-    // Get sample entry
-    if (libConfig.structureType === 'nested_array') {
-      const commonProps = entries.common_props || [];
-      sampleEntry = commonProps[0];
+    // Get sample entry - check structure type from metadata
+    const structureType = libConfig.metadata?.structureType;
+    if (structureType === 'nested_array') {
+      const commonProps = (entries.common_props as unknown[]) || [];
+      sampleEntry = commonProps[0] as Record<string, unknown>;
     } else {
       const firstKey = Object.keys(entries)[0];
-      sampleEntry = entries[firstKey];
+      sampleEntry = entries[firstKey] as Record<string, unknown>;
     }
 
     if (!sampleEntry) continue;
@@ -50,7 +56,7 @@ async function generateVariableMetadata(): Promise<VariableMetadata[]> {
         ? 'array'
         : typeof value === 'object' && value !== null
         ? 'object'
-        : (typeof value as any);
+        : typeof value as 'string' | 'number' | 'boolean';
 
       variables.push({
         path: variablePath,
