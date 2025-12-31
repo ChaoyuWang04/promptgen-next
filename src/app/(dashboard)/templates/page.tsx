@@ -5,7 +5,7 @@
  * Interface for creating and editing prompt templates
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type * as Monaco from 'monaco-editor';
 import {
@@ -92,6 +92,10 @@ export default function TemplatesPage() {
   // Dynamically load variables based on current template's category
   const { data: variables, isLoading: variablesLoading } = useTemplateVariables(currentCategory);
   const { data: config } = useLibraryConfig();
+  const validLibraryNames = useMemo(
+    () => config?.enabled_libraries?.map((lib) => lib.name) ?? [],
+    [config?.enabled_libraries]
+  );
   const previewMutation = usePreviewTemplate();
   const createMutation = useCreateTemplate();
   const updateMutation = useUpdateTemplate();
@@ -170,7 +174,9 @@ export default function TemplatesPage() {
   // Parse library references when template changes (switch or save)
   useEffect(() => {
     if (currentTemplate?.content) {
-      const libs = extractLibrariesFromTemplate(currentTemplate.content);
+      const libs = extractLibrariesFromTemplate(currentTemplate.content, {
+        validLibraryNames,
+      });
       setReferencedLibraries(libs);
       // Clear previous selections and preview when template changes
       setPreviewSelections({});
@@ -178,7 +184,7 @@ export default function TemplatesPage() {
     } else {
       setReferencedLibraries([]);
     }
-  }, [selectedTemplate, currentTemplate?.content]);
+  }, [selectedTemplate, currentTemplate?.content, validLibraryNames]);
 
   // Add beforeunload event listener to warn about unsaved changes
   useEffect(() => {
@@ -263,7 +269,9 @@ export default function TemplatesPage() {
       });
       setOriginalContent(editorContent);
       // Update referenced libraries after save
-      const libs = extractLibrariesFromTemplate(editorContent);
+      const libs = extractLibrariesFromTemplate(editorContent, {
+        validLibraryNames,
+      });
       setReferencedLibraries(libs);
       // Clear previous selections since template content changed
       setPreviewSelections({});
@@ -299,7 +307,9 @@ export default function TemplatesPage() {
       setShowSaveAsDialog(false);
 
       // Update referenced libraries after save
-      const libs = extractLibrariesFromTemplate(editorContent);
+      const libs = extractLibrariesFromTemplate(editorContent, {
+        validLibraryNames,
+      });
       setReferencedLibraries(libs);
       // Clear previous selections
       setPreviewSelections({});

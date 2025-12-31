@@ -11,6 +11,10 @@
 
 import { isValidLibraryName } from '../config/library-config';
 
+export interface ExtractLibrariesOptions {
+  validLibraryNames?: string[] | Set<string>;
+}
+
 /**
  * Extract library names referenced in template content
  *
@@ -24,7 +28,10 @@ import { isValidLibraryName } from '../config/library-config';
  * const content = "{{character.name}} in {{scene.location}} with {{pose.emotion}}";
  * extractLibrariesFromTemplate(content); // ['character', 'scene', 'pose']
  */
-export function extractLibrariesFromTemplate(content: string): string[] {
+export function extractLibrariesFromTemplate(
+  content: string,
+  options: ExtractLibrariesOptions = {}
+): string[] {
   if (!content || content.trim() === '') {
     return [];
   }
@@ -33,13 +40,21 @@ export function extractLibrariesFromTemplate(content: string): string[] {
   const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_][a-zA-Z0-9_]*(?:\s*\|[^}]*)?\}\}/g;
 
   const libraries = new Set<string>();
+  const validLibraryNames = options.validLibraryNames
+    ? Array.isArray(options.validLibraryNames)
+      ? new Set(options.validLibraryNames)
+      : options.validLibraryNames
+    : null;
   let match: RegExpExecArray | null;
 
   while ((match = variablePattern.exec(content)) !== null) {
     const libraryName = match[1]; // Capture group 1: library name
 
     // Validate against known library names (uses cached config)
-    if (isValidLibraryName(libraryName)) {
+    const isValid = validLibraryNames
+      ? validLibraryNames.has(libraryName)
+      : isValidLibraryName(libraryName);
+    if (isValid) {
       libraries.add(libraryName);
     }
   }

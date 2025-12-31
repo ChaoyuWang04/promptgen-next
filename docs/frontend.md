@@ -145,3 +145,7 @@ Defined in `src/app/globals.css`:
 - Set<string> for selected IDs
 - Checkbox in list items
 - Batch action buttons
+
+### Template Editor Notes
+
+- Client-side template parsing validates library names using `/api/libraries/config` data to avoid Prisma in the browser.
