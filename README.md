@@ -2,8 +2,10 @@
 <br />
 <div align="center">
   <a href="https://github.com/ChaoyuWang04/promptgen-next">
-    <h3 align="center">PromptGen</h3>
+    <img src="images/logo.jpg" alt="Logo" width="100" height="100">
   </a>
+
+<h3 align="center">PromptGen</h3>
 
 <p align="center">
   An end-to-end prompt generation and image production system built with Next.js, Prisma, PostgreSQL, Redis, and multi-provider AI image orchestration.
